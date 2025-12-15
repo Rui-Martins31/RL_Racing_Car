@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <sys/socket.h>
 
+// Custom scripts
+#include "utils/parser.hpp"
+
 // Globals
 const char* SERVER_IP = "127.0.0.1";
 const int SERVER_PORT = 3001;
@@ -42,7 +45,7 @@ int main()
 
     // DEBUG
     std::cout << "Connected to TORCS server..." << std::endl;
-    std::cout << "Receveiving feddback from TORCS server...\n" << std::endl;
+    std::cout << "Receveiving feedback from TORCS server...\n" << std::endl;
 
     char message[BUFFER_SIZE];
     socklen_t len = sizeof(servaddr);
@@ -50,11 +53,18 @@ int main()
     // Loop
     while (true)
     {
-        // DEBUG received messages
-        recv(sockfd, message, sizeof(message), 0);
-        std::cout << "Message from client: " << message << std::endl;
+        // Receive message
+        int n_chars = recv(sockfd, message, sizeof(message), 0);
+        message[n_chars] = '\0';
 
-        
+        // DEBUG
+        // std::cout << "Message from client: " << message << std::endl;
+
+        // Parse message
+        MessageServer message_parsed = parse_message_from_server(message);
+
+        // Control
+        // ...
     }
 
     // Close socket
