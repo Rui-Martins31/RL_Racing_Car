@@ -1,13 +1,18 @@
 # Table of Contents
 
-* How to Run
-* Message Protocol
+1. [How to Run](#how-to-run)
+2. [Message Protocol](#message-protocol)
 
 --- 
 # How to Run
 
-Execute the following command in the terminal:
+Both the agent and the simulator (TORCS) should be run separately in two different terminals.
+
+To run the simulator you should check the README in [TORCS Repository](https://github.com/fmirus/torcs-1.3.7).
+
+To run the agent, execute the following commands in the terminal:
 ```
+g++ client.cpp utils/parser.cpp -o agent
 ./agent
 ```
 
