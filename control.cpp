@@ -1,10 +1,18 @@
 #include <iostream>
+#include <cmath>
 
 // Custom scripts
 #include "control.hpp"
 
 // Globals
-#define DEBUG true
+#define DEBUG false
+
+#define MAX_SPEED 40.0
+
+float velocity(float vel_x, float vel_y, float vel_z)
+{
+    return sqrt( pow(vel_x, 2) + pow(vel_y, 2) + pow(vel_z, 2) );
+}
 
 MessageClient control(MessageServer message)
 {
@@ -20,7 +28,13 @@ MessageClient control(MessageServer message)
     MessageClient control;
 
     // Control based on distance to the central point
-    control.accel = 0.25;
+    // Gas control
+    float vel = velocity(message.speedX, message.speedY, message.speedZ);
+
+    if (vel <= MAX_SPEED) { control.accel = 0.25; }
+    else { control.accel = 0.0; }
+
+    // Brake control
     control.brake = 0.0;
 
     // Steering control

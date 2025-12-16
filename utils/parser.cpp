@@ -21,7 +21,7 @@ float get_key(const char* message, const char* key) {
 MessageServer parse_message_from_server(const char* message)
 {
     // DEBUG
-    if (DEBUG) { std::cout << "\nMessage to parse: " << message << std::endl; }
+    // if (DEBUG) { std::cout << "\nMessage to parse: " << message << std::endl; }
 
     // Initialize message struct
     MessageServer message_parsed;
