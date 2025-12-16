@@ -1,6 +1,10 @@
 #include <stdio.h>
 
+// Custom scripts
 #include "control.hpp"
+
+// Globals
+#define DEBUG false
 
 MessageClient control(MessageServer message)
 {

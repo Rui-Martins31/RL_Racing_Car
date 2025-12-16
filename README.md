@@ -13,10 +13,9 @@ To run the simulator you should check the README in [TORCS Repository](https://g
 A window will pop up after initializing the simulator. To test the agent we should start a race by clicking on *Race* -> *Quick Race* -> *New Race*.
 The simulator will wait until the agent is started.
 
-To run the agent, execute the following commands in the terminal:
+To run the agent, execute the following command in the terminal:
 ```
-g++ client.cpp utils/parser.cpp -o agent
-./agent
+bash start_client.bash
 ```
 
 The race should now start!
