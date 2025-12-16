@@ -6,7 +6,7 @@
 #include "parser.hpp"
 
 // Gobals
-#define DEBUG false
+#define DEBUG true
 
 // Helper
 float get_key(const char* message, const char* key) {
@@ -53,13 +53,13 @@ std::string parse_message_from_client(MessageClient control_message)
     // Message to send
     std::string message = "";
     
-    message += "(accel "    + std::to_string(control_message.accel)    + ")";
-    message += "(brake "    + std::to_string(control_message.brake)    + ")";
-    message += "(clutch "   + std::to_string(control_message.clutch)   + ")";
-    message += "(gear "     + std::to_string(control_message.gear)     + ")";
-    message += "(steering " + std::to_string(control_message.steering) + ")";
-    message += "(focus "    + std::to_string(control_message.focus)    + ")";
-    message += "(meta "     + std::to_string(control_message.meta)     + ")";
+    message += "(accel "  + std::to_string(control_message.accel)  + ")";
+    message += "(brake "  + std::to_string(control_message.brake)  + ")";
+    message += "(clutch " + std::to_string(control_message.clutch) + ")";
+    message += "(gear "   + std::to_string(control_message.gear)   + ")";
+    message += "(steer "  + std::to_string(control_message.steer)  + ")";
+    message += "(focus "  + std::to_string(control_message.focus)  + ")";
+    message += "(meta "   + std::to_string(control_message.meta)   + ")";
     message += "\0";
 
     // DEBUG

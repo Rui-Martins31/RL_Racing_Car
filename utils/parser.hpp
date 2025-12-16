@@ -22,7 +22,7 @@ struct MessageClient
     // Vars to control
     float accel;
     float brake;
-    float steering;
+    float steer;
 
     // 
     float clutch;

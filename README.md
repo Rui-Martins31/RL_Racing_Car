@@ -79,7 +79,7 @@ Message from client:
     (brake <float>)
     (clutch <float>)
     (gear <int>)
-    (steering <float>)
+    (steer <float>)
     (focus <float>)
     (meta <bool>)
 ```
