@@ -7,7 +7,7 @@
 // Globals
 #define DEBUG false
 
-#define MAX_SPEED 80.0
+#define MAX_SPEED 40.0
 
 float velocity(float vel_x, float vel_y, float vel_z)
 {
