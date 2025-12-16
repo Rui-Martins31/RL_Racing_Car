@@ -12,10 +12,31 @@
 #include "control.hpp"
 
 // Globals
-const char* SERVER_IP = "127.0.0.1";
-const int SERVER_PORT = 3001;
-const int BUFFER_SIZE = 4096;
-const int MAX_STEPS   = 0;
+const char* SERVER_IP    = "127.0.0.1";
+const int SERVER_PORT    = 3001;
+const int SOCKET_TIMEOUT = 3;
+const int BUFFER_SIZE    = 4096;
+const int MAX_STEPS      = 0;
+
+bool handshake(int sockfd, sockaddr_in servaddr)
+{
+    std::cout << "Sending..." << std::endl;
+    // Send
+    std::string init_str = "SCR init";
+    sendto(sockfd, init_str.c_str(), init_str.length(), 0, 
+            (const struct sockaddr *) &servaddr, sizeof(servaddr));
+
+    std::cout << "Receiving..." << std::endl;
+    // Receive
+    char message[BUFFER_SIZE];
+    int n_chars = recv(sockfd, message, sizeof(message), 0);
+
+    std::cout << "Returning..." << std::endl;
+    std::cout << message << std::endl;
+    
+    if (strcmp(message, "***identified***") == 0 /*|| strcmp(message, "***restart***") == 0*/) return true;
+    else return false;
+}
 
 int main()
 {
@@ -31,6 +52,15 @@ int main()
         return -1;
     }
 
+    struct timeval timeout;
+    timeout.tv_sec = SOCKET_TIMEOUT;
+
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("setsockopt failed");
+        close(sockfd);
+        return 1;
+    }
+
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(SERVER_PORT);
@@ -40,10 +70,9 @@ int main()
     }
 
     // Intial handshake
-    std::string init_str = "SCR init";
-    sendto(sockfd, init_str.c_str(), init_str.length(), 0, 
-            (const struct sockaddr *) &servaddr, sizeof(servaddr));
-    
+    while (!handshake(sockfd, servaddr)) {std::cout << ".";}
+
+
     // DEBUG
     std::cout << "Connected to TORCS server..." << std::endl;
     std::cout << "Receveiving feedback from TORCS server...\n" << std::endl;
@@ -56,6 +85,15 @@ int main()
     {
         // Receive message
         int n_chars = recv(sockfd, message, sizeof(message), 0);
+
+        if (strcmp(message, "***restart***") == 0) 
+        {
+            std::cout << "Restarting..." << std::endl;
+
+            // Restart
+            while (!handshake(sockfd, servaddr)) {std::cout << ".";}
+            continue;
+        }
         message[n_chars] = '\0';
 
         // DEBUG

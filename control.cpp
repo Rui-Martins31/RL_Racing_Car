@@ -7,7 +7,7 @@
 // Globals
 #define DEBUG false
 
-#define MAX_SPEED 40.0
+#define MAX_SPEED 80.0
 
 float velocity(float vel_x, float vel_y, float vel_z)
 {
@@ -15,15 +15,7 @@ float velocity(float vel_x, float vel_y, float vel_z)
 }
 
 MessageClient control(MessageServer message)
-{
-    // DEBUG
-    if (DEBUG) 
-    {
-        std::cout << "\nAngle: "    << std::to_string(message.angle)
-                  << "\nTrackPos: " << std::to_string(message.trackPos)
-                  << std::endl;
-    }
-    
+{   
     // Control struct
     MessageClient control;
 
@@ -42,11 +34,15 @@ MessageClient control(MessageServer message)
     float curr_pos   = message.trackPos; // TrackPos: [-1, 1]
     control.steer    = -curr_pos; // - (curr_angle/3.1416);
     
-    // DO NOT CHANGE
+    // DO NOT CHANGE ----
     control.clutch = 0.0;
     control.focus  = 0.0;
     control.gear   = 1;
-    control.meta   = false;
+    
+    // Check if car is out of track
+    if (message.trackPos < -1.0 || message.trackPos > 1.0) { control.meta = true; }
+    else { control.meta = false; }
+    // DO NOT CHANGE ----
 
     return control;
 }
