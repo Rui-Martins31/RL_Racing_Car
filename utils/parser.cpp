@@ -2,8 +2,11 @@
 #include <cstring>
 #include <cstdlib>
 
+// Custom scripts
 #include "parser.hpp"
 
+// Gobals
+#define DEBUG false
 
 // Helper
 float get_key(const char* message, const char* key) {
@@ -14,11 +17,11 @@ float get_key(const char* message, const char* key) {
     return 0.0f;
 }
 
-
+// Main methods
 MessageServer parse_message_from_server(const char* message)
 {
     // DEBUG
-    std::cout << "Message to parse: " << message << std::endl;
+    if (DEBUG) { std::cout << "\nMessage to parse: " << message << std::endl; }
 
     // Initialize message struct
     MessageServer message_parsed;
@@ -31,13 +34,36 @@ MessageServer parse_message_from_server(const char* message)
     message_parsed.speedZ   = get_key(message, "(speedZ ");
     
     // DEBUG
-    std::cout << "Message Parsed:\n"
-              << "  Angle:" << message_parsed.angle
-              << "  Track Pos:" << message_parsed.trackPos
-              << "  Speed X:" << message_parsed.speedX
-              << "  Speed Y:" << message_parsed.speedY
-              << "  Speed Z:" << message_parsed.speedZ
-              << std::endl;
+    if (DEBUG)
+    {
+        std::cout << "Message Parsed:"
+                << "\n  Angle:" << message_parsed.angle
+                << "\n  Track Pos:" << message_parsed.trackPos
+                << "\n  Speed X:" << message_parsed.speedX
+                << "\n  Speed Y:" << message_parsed.speedY
+                << "\n  Speed Z:" << message_parsed.speedZ
+                << std::endl;
+    }
 
     return message_parsed;
+}
+
+std::string parse_message_from_client(MessageClient control_message)
+{
+    // Message to send
+    std::string message = "";
+    
+    message += "(accel "    + std::to_string(control_message.accel)    + ")";
+    message += "(brake "    + std::to_string(control_message.brake)    + ")";
+    message += "(clutch "   + std::to_string(control_message.clutch)   + ")";
+    message += "(gear "     + std::to_string(control_message.gear)     + ")";
+    message += "(steering " + std::to_string(control_message.steering) + ")";
+    message += "(focus "    + std::to_string(control_message.focus)    + ")";
+    message += "(meta "     + std::to_string(control_message.meta)     + ")";
+    message += "\0";
+
+    // DEBUG
+    if (DEBUG) { std::cout << "Message Control:\n" << message << std::endl; }
+
+    return message;
 }

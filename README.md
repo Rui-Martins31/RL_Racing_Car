@@ -24,9 +24,11 @@ The race should now start!
 ---
 # Message Protocol
 
+The message protocol is well explored in this [document](https://arxiv.org/pdf/1304.1672) in case you would like to get more information.
+
 ## Initial Handshake
 
-To start a Quick Race, the user must send connect to PORT 3001 and send a request similar to the following one:
+To start a Quick Race, the user must connect to PORT 3001 and send a request similar to the following one:
 
 ```
 "SCR(init -1.0 1.0 1.0 0.0 \"Driver\")"

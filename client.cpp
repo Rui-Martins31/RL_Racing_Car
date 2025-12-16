@@ -9,6 +9,7 @@
 
 // Custom scripts
 #include "utils/parser.hpp"
+#include "control.hpp"
 
 // Globals
 const char* SERVER_IP = "127.0.0.1";
@@ -60,11 +61,18 @@ int main()
         // DEBUG
         // std::cout << "Message from client: " << message << std::endl;
 
-        // Parse message
+        // Parse server message
         MessageServer message_parsed = parse_message_from_server(message);
 
         // Control
-        // ...
+        MessageClient message_control = control(message_parsed); 
+
+        // Create client message
+        std::string response = parse_message_from_client(message_control);
+
+        // Send control message
+        sendto(sockfd, response.c_str(), response.length(), 0,
+                (const struct sockaddr *) &servaddr, sizeof(servaddr));
     }
 
     // Close socket
