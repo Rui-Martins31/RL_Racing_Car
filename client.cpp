@@ -42,8 +42,8 @@ int main()
     // Intial handshake
     std::string init_str = "SCR(init -1.0 1.0 1.0 0.0 \"PdaddDriver\")";
     sendto(sockfd, init_str.c_str(), init_str.length(), 0, 
-           (const struct sockaddr *) &servaddr, sizeof(servaddr));
-
+            (const struct sockaddr *) &servaddr, sizeof(servaddr));
+    
     // DEBUG
     std::cout << "Connected to TORCS server..." << std::endl;
     std::cout << "Receveiving feedback from TORCS server...\n" << std::endl;
