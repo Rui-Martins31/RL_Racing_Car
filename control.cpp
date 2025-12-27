@@ -7,6 +7,14 @@
 // Globals
 #define DEBUG false
 
+/*
+Rewards:
+    - Out of bounds: -10
+    - Complete lap: +10
+    - Time on track: +1 * #min
+    - Fastest lap: +5
+*/
+
 #define MAX_SPEED 40.0
 
 float velocity(float vel_x, float vel_y, float vel_z)
