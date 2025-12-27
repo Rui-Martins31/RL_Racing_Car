@@ -81,8 +81,10 @@ int main()
     socklen_t len = sizeof(servaddr);
 
     // Loop
+    int episode_num    = 1;
+    int episode_cycles = 1; 
     while (true)
-    {
+    {        
         // Receive message
         int n_chars = recv(sockfd, message, sizeof(message), 0);
 
@@ -92,6 +94,9 @@ int main()
 
             // Restart
             while (!handshake(sockfd, servaddr)) {std::cout << ".";}
+            episode_num   += 1;
+            episode_cycles = 1; 
+
             continue;
         }
         message[n_chars] = '\0';
@@ -100,10 +105,10 @@ int main()
         // std::cout << "Message from client: " << message << std::endl;
 
         // Parse server message
-        MessageServer message_parsed = parse_message_from_server(message);
+        MessageServer message_parsed  = parse_message_from_server(message);
 
         // Control
-        MessageClient message_control = control(message_parsed); 
+        MessageClient message_control = control(episode_num, episode_cycles, message_parsed); 
 
         // Create client message
         std::string response = parse_message_from_client(message_control);
@@ -111,6 +116,9 @@ int main()
         // Send control message
         sendto(sockfd, response.c_str(), response.length(), 0,
                 (const struct sockaddr *) &servaddr, sizeof(servaddr));
+
+        // Update
+        episode_cycles += 1;
     }
 
     // Close socket

@@ -119,7 +119,7 @@ size_t NeuralNetwork::getWeightCount() const
 
 void NeuralNetwork::saveToCSV(const std::string& filepath, int episode, float reward) const
 {
-    std::ofstream file(filepath);
+    std::ofstream file(filepath, std::ios_base::app | std::ios_base::out);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file for writing: " << filepath << std::endl;
         return;
