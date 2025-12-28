@@ -24,6 +24,14 @@ public:
     //              false = zero weights
     NeuralNetwork(std::vector<uint> topology, bool random_init = true, Scalar learningRate = Scalar(0.005));
 
+    // Copy constructor and assignment
+    NeuralNetwork(const NeuralNetwork& other);
+    NeuralNetwork& operator=(const NeuralNetwork& other);
+
+    // Move constructor and assignment
+    NeuralNetwork(NeuralNetwork&& other) noexcept;
+    NeuralNetwork& operator=(NeuralNetwork&& other) noexcept;
+
     // Destructor
     ~NeuralNetwork();
 

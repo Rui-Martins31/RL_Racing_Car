@@ -14,10 +14,7 @@
 
 // Auxiliary functions
 float velocity(float vel_x, float vel_y, float vel_z);
-int reward(/* args */);
-
-// Control based on the current sensor values
-MessageClient control(int episode_num, int episode_cycles, MessageServer message);
+int reward(bool out_of_bounds, float dist_raced);
 
 // Agent
 class Agent

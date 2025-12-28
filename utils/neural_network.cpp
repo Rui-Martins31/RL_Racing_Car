@@ -58,6 +58,68 @@ NeuralNetwork::~NeuralNetwork()
     for (auto* weight : weights)     delete weight;
 }
 
+// Copy constructor - deep copy
+NeuralNetwork::NeuralNetwork(const NeuralNetwork& other)
+    : learningRate(other.learningRate), topology(other.topology)
+{
+    for (const auto* layer : other.neuronLayers) {
+        neuronLayers.push_back(new RowVector(*layer));
+    }
+    for (const auto* weight : other.weights) {
+        weights.push_back(new Matrix(*weight));
+    }
+}
+
+// Copy assignment operator
+NeuralNetwork& NeuralNetwork::operator=(const NeuralNetwork& other)
+{
+    if (this != &other) {
+        // Clean up existing resources
+        for (auto* layer : neuronLayers) delete layer;
+        for (auto* weight : weights) delete weight;
+        neuronLayers.clear();
+        weights.clear();
+
+        // Copy data
+        learningRate = other.learningRate;
+        topology = other.topology;
+
+        for (const auto* layer : other.neuronLayers) {
+            neuronLayers.push_back(new RowVector(*layer));
+        }
+        for (const auto* weight : other.weights) {
+            weights.push_back(new Matrix(*weight));
+        }
+    }
+    return *this;
+}
+
+// Move constructor
+NeuralNetwork::NeuralNetwork(NeuralNetwork&& other) noexcept
+    : neuronLayers(std::move(other.neuronLayers)),
+      weights(std::move(other.weights)),
+      learningRate(other.learningRate),
+      topology(std::move(other.topology))
+{
+}
+
+// Move assignment operator
+NeuralNetwork& NeuralNetwork::operator=(NeuralNetwork&& other) noexcept
+{
+    if (this != &other) {
+        // Clean up existing resources
+        for (auto* layer : neuronLayers) delete layer;
+        for (auto* weight : weights) delete weight;
+
+        // Move data
+        neuronLayers = std::move(other.neuronLayers);
+        weights = std::move(other.weights);
+        learningRate = other.learningRate;
+        topology = std::move(other.topology);
+    }
+    return *this;
+}
+
 RowVector NeuralNetwork::propagateForward(RowVector& input)
 {
     // Set the input to input layer (excluding bias neuron)

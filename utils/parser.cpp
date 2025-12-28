@@ -28,6 +28,8 @@ MessageServer parse_message_from_server(const char* message)
     message_parsed.speedX   = get_key(message, "(speedX ");
     message_parsed.speedY   = get_key(message, "(speedY ");
     message_parsed.speedZ   = get_key(message, "(speedZ ");
+
+    message_parsed.distRaced = get_key(message, "(distRaced ");
     
     // DEBUG
     if (DEBUG)
@@ -38,6 +40,7 @@ MessageServer parse_message_from_server(const char* message)
                 << "\n  Speed X:" << message_parsed.speedX
                 << "\n  Speed Y:" << message_parsed.speedY
                 << "\n  Speed Z:" << message_parsed.speedZ
+                << "\n  Dist Raced:" << message_parsed.distRaced
                 << std::endl;
     }
 

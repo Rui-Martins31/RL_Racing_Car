@@ -18,6 +18,9 @@ struct MessageServer
     float speedX;
     float speedY;
     float speedZ;
+
+    // Variables for reward computation
+    float distRaced;
 }; // This vars are enough for now
 
 struct MessageClient

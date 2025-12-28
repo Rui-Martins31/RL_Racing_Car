@@ -54,7 +54,8 @@ int main()
     }
 
     struct timeval timeout;
-    timeout.tv_sec = SOCKET_TIMEOUT;
+    timeout.tv_sec  = SOCKET_TIMEOUT;
+    timeout.tv_usec = 0;
 
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("setsockopt failed");
@@ -82,6 +83,7 @@ int main()
     socklen_t len = sizeof(servaddr);
 
     // Loop
+    Generation gen;
     float episode_num  = 1;
     int episode_cycles = 1;
     while (true)
@@ -115,7 +117,8 @@ int main()
         MessageServer message_parsed  = parse_message_from_server(message);
 
         // Control
-        MessageClient message_control = control((int)episode_num, episode_cycles, message_parsed);
+        // MessageClient message_control = control((int)episode_num, episode_cycles, message_parsed);
+        MessageClient message_control = gen.step(episode_cycles, message_parsed);
 
         // Create client message
         std::string response = parse_message_from_client(message_control);

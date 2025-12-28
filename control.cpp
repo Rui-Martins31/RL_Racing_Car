@@ -10,97 +10,30 @@
 #define NN_TOPOLOGY {3, 3, 3}
 #define NN_LEARNING_RATE 0.005
 
-/*
-Rewards:
-    - Out of bounds: -10
-    - Complete lap: +10
-    - Time on track: +1 * #min
-    - Fastest lap: +5
-*/
 
-#define MAX_SPEED 40.0
-
+// Auxiliary Functions
 float velocity(float vel_x, float vel_y, float vel_z)
 {
     return sqrt( pow(vel_x, 2) + pow(vel_y, 2) + pow(vel_z, 2) );
 }
 
-int reward(/* args */)
+int reward(bool out_of_bounds, float dist_raced)
 {
-    return 10;
-}
+    /*
+    Rewards:
+        - Out of bounds: -10
+        - Complete lap: +10
+        - Distance raced: +10 * distance
+        - Fastest lap: +5
+    */
 
-MessageClient control(int episode_num, int episode_cycles, MessageServer message)
-{   
-    // Control struct
-    MessageClient control;
+    // Reward
+    int reward_total = 0;
 
-    // Neural Network
-    NeuralNetwork nn(
-        NN_TOPOLOGY,
-        true,
-        NN_LEARNING_RATE
-    );
+    if (out_of_bounds) reward_total += -10;
+    reward_total += 10 * dist_raced;
 
-    if (NN_CONTROL) {
-        // Control based on NeuralNetwork
-        // Inputs {vel, ang, pos}
-        RowVector inputs(3);
-        inputs[0] = velocity(message.speedX, message.speedY, message.speedZ), 0.0, 1.0;
-        inputs[1] = message.angle;
-        inputs[2] = message.trackPos;
-
-        // Forward {accel, brake, steer}
-        RowVector outputs = nn.propagateForward(inputs);
-
-        // Output
-        control.accel = outputs[0];
-        control.brake = outputs[1];
-        control.steer = outputs[2];
-    }
-    else {
-        // Control based on distance to the central point
-        // Gas control
-        float vel = velocity(message.speedX, message.speedY, message.speedZ);
-        
-        if (vel <= MAX_SPEED) { control.accel = 0.25; }
-        else { control.accel = 0.0; }
-        
-        // Brake control
-        control.brake = 0.0;
-        
-        // Steering control
-        float curr_angle = message.angle;    // Angle: [-Pi, Pi]
-        float curr_pos   = message.trackPos; // TrackPos: [-1, 1]
-        control.steer    = -curr_pos; // - (curr_angle/3.1416);
-    }
-    
-    // DO NOT CHANGE ----
-    control.clutch = 0.0;
-    control.focus  = 0.0;
-    control.gear   = 1;
-    
-    // Check if car is out of track
-    if ((message.trackPos < -1.0 || message.trackPos > 1.0) || (episode_cycles % EPISODE_MAX == 0)) {
-        control.meta = true;
-
-        if (NN_CONTROL) {
-            // Store weights
-            int final_reward = reward();
-            nn.saveToCSV(
-                PATH_OUTPUT,
-                episode_num,
-                final_reward
-            );
-        }
-    }
-    else control.meta = false;
-    // DO NOT CHANGE ----
-
-    // DEBUG 
-    std::cout << "Episode cycles: " << episode_cycles << std::endl;
-
-    return control;
+    return reward_total;
 }
 
 // Agent
@@ -293,11 +226,16 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     
     // Check if car is out of track
     // or if it's the end of episode
-    if ((message.trackPos < -1.0 || message.trackPos > 1.0) || (episode_cycles % EPISODE_MAX == 0)) {
+    bool out_of_bounds  = (message.trackPos < -1.0 || message.trackPos > 1.0);
+    bool end_of_episode = (episode_cycles % EPISODE_MAX == 0);
+    if (out_of_bounds || end_of_episode) {
         control.meta = true;
 
         // Store weights
-        int final_reward = reward();
+        int final_reward = reward(
+            out_of_bounds,
+            message.distRaced
+        );
         this->arr_agents[this->agent_num_curr].nn.saveToCSV(
             PATH_OUTPUT,
             this->generation_num_curr,
@@ -324,6 +262,9 @@ void Generation::update(float reward)
     // Check end of gen
     if (this->agent_num_curr == this->AGENTS_NUM_TOTAL - 1) {
         
+        // DEBUG
+        std::cout << "Starting new Generation number " << this->generation_num_curr+1 << std::endl;
+        
         this->populate();
         this->generation_num_curr += 1;
         this->agent_num_curr       = 0;
@@ -338,19 +279,26 @@ void Generation::populate()
 {
     // Pick the top agents
     // In case there are more than the maximum
-    if (this->arr_agents.size() == this->AGENTS_NUM_TOTAL){
+    std::cout << "Picking top agents..." << std::endl;
+    if (this->arr_agents.size() > this->AGENTS_NUM_SURVIVE){
 
         // Sort agents by reward in descending order
+        std::cout << "Sort agents..." << std::endl;
         std::sort(this->arr_agents.begin(), this->arr_agents.end(),
             [](const Agent& a, const Agent& b) {
                 return a.reward > b.reward;
             });
 
         // Keep only the top agents
-        this->arr_agents.erase(this->arr_agents.begin() + this->AGENTS_NUM_SURVIVE, this->arr_agents.end());
+        std::cout << "Erase low reward agents..." << std::endl;
+        this->arr_agents.erase(
+            this->arr_agents.begin() + this->AGENTS_NUM_SURVIVE, 
+            this->arr_agents.end()
+        );
     }
 
     // Mutate and randomize new agents
+    std::cout << "Giving birth to new agents..." << std::endl;
     for (size_t agent_idx = this->AGENTS_NUM_SURVIVE;
          agent_idx < this->AGENTS_NUM_TOTAL;
          agent_idx++)
