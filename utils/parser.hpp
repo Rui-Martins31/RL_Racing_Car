@@ -1,6 +1,9 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
+#include <iostream>
+#include <cstring>
+#include <cstdlib>
 #include <string>
 
 // Structs

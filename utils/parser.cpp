@@ -1,7 +1,3 @@
-#include <iostream>
-#include <cstring>
-#include <cstdlib>
-
 // Custom scripts
 #include "parser.hpp"
 

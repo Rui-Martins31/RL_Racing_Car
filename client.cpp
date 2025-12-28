@@ -30,11 +30,12 @@ bool handshake(int sockfd, sockaddr_in servaddr)
     // Receive
     char message[BUFFER_SIZE];
     int n_chars = recv(sockfd, message, sizeof(message), 0);
+    message[n_chars] = '\0';
 
     std::cout << "Returning..." << std::endl;
     std::cout << message << std::endl;
     
-    if (strcmp(message, "***identified***") == 0 /*|| strcmp(message, "***restart***") == 0*/) return true;
+    if (strcmp(message, "***identified***") == 0) return true;
     else return false;
 }
 
@@ -81,34 +82,40 @@ int main()
     socklen_t len = sizeof(servaddr);
 
     // Loop
-    int episode_num    = 1;
-    int episode_cycles = 1; 
+    float episode_num  = 1;
+    int episode_cycles = 1;
     while (true)
     {        
         // Receive message
-        int n_chars = recv(sockfd, message, sizeof(message), 0);
+        int n_chars      = recv(sockfd, message, sizeof(message), 0);
+        message[n_chars] = '\0';
 
         if (strcmp(message, "***restart***") == 0) 
         {
             std::cout << "Restarting..." << std::endl;
 
             // Restart
-            while (!handshake(sockfd, servaddr)) {std::cout << ".";}
-            episode_num   += 1;
-            episode_cycles = 1; 
+            while (true) {
+                bool handshake_result = handshake(sockfd, servaddr);
+                if (handshake_result) break;
+
+                std::cout << ".";
+            }
+            episode_num   += 0.5;
+            episode_cycles = 1;
 
             continue;
         }
-        message[n_chars] = '\0';
 
         // DEBUG
         // std::cout << "Message from client: " << message << std::endl;
+        // std::cout << "Episode num: " << episode_num << std::endl;
 
         // Parse server message
         MessageServer message_parsed  = parse_message_from_server(message);
 
         // Control
-        MessageClient message_control = control(episode_num, episode_cycles, message_parsed); 
+        MessageClient message_control = control((int)episode_num, episode_cycles, message_parsed);
 
         // Create client message
         std::string response = parse_message_from_client(message_control);

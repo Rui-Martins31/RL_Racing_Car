@@ -1,4 +1,5 @@
 #include "../utils/neural_network.hpp"
+#include "../control.hpp"
 
 
 // Globals
@@ -11,10 +12,12 @@
 
 int test_01(int result, bool debug);
 int test_02(bool debug);
+int test_03(bool debug);
 
 int main(){
     test_01(70, DEBUG);
     test_02(DEBUG);
+    test_03(DEBUG);
 
     return 0;
 }
@@ -75,6 +78,23 @@ int test_02(bool debug) {
 
     if (debug)
         std::cout << "Wrote to file " << PATH_OUTPUT << std::endl;
+
+    return 1;
+}
+
+// Test Generation class
+int test_03(bool debug) {
+    if (debug)
+        std::cout << " -- Test 3 -- " << std::endl;
+
+    Generation gen;
+
+    std::cout << "Gen initialized." << std::endl;
+
+    // Check values
+    std::cout << "Current agent number: "      << gen.get_current_agent_num()      << std::endl;
+    std::cout << "Current generation number: " << gen.get_current_generation_num() << std::endl;
+    std::cout << "Current weight: " << gen.get_weights_from_agent(0)[0]  << std::endl;
 
     return 1;
 }
