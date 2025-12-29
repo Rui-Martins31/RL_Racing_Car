@@ -7,6 +7,8 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <sstream>
+#include <cmath>
 
 // Types
 typedef float Scalar;
@@ -15,7 +17,7 @@ typedef Eigen::RowVectorXf RowVector;
 typedef Eigen::VectorXf ColVector;
 
 // Activation functions
-Scalar activationFunction(Scalar x);
+Scalar activationFunction(Scalar x, bool use_relu);
 
 class NeuralNetwork {
 public:

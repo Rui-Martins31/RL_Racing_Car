@@ -2,6 +2,7 @@
 
 1. [How to Run](#how-to-run)
 2. [Message Protocol](#message-protocol)
+3. [Methodology](#methodology)
 
 --- 
 # How to Run
@@ -83,3 +84,7 @@ Message from client:
     (focus <float>)
     (meta <bool>)
 ```
+
+---
+
+# Methodology

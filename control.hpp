@@ -15,6 +15,8 @@
 // Auxiliary functions
 float velocity(float vel_x, float vel_y, float vel_z);
 int reward(bool out_of_bounds, float dist_raced);
+float remap(float value, float original_min, float original_max,
+                         float new_min, float new_max);
 
 // Agent
 class Agent
@@ -37,8 +39,8 @@ class Generation
 {
 private:
     // Constants
-    const int AGENTS_NUM_TOTAL   = 50;
-    const int AGENTS_NUM_SURVIVE = 25;
+    const int AGENTS_NUM_TOTAL   = 25; // 50
+    const int AGENTS_NUM_SURVIVE = 10; // 25
 
     const float AGENT_PROB_NEW   = 0.25; // Probability of a new agent being born
 

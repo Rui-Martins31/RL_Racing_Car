@@ -6,8 +6,7 @@
 #define PATH_OUTPUT "output.csv"
 #define EPISODE_MAX 1000
 
-#define NN_CONTROL true
-#define NN_TOPOLOGY {3, 3, 3}
+#define NN_TOPOLOGY {3, 3} // {3, 3, 3}
 #define NN_LEARNING_RATE 0.005
 
 
@@ -15,6 +14,12 @@
 float velocity(float vel_x, float vel_y, float vel_z)
 {
     return sqrt( pow(vel_x, 2) + pow(vel_y, 2) + pow(vel_z, 2) );
+}
+
+float remap(float value, float original_min, float original_max,
+                         float new_min, float new_max)
+{
+    return new_min + (value - original_min) * (new_max - new_min) / (original_max - original_min);
 }
 
 int reward(bool out_of_bounds, float dist_raced)
@@ -214,8 +219,8 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     RowVector outputs = nn.propagateForward(inputs);
 
     // Output
-    control.accel = outputs[0];
-    control.brake = outputs[1];
+    control.accel = outputs[0];//remap(outputs[0], -1.0, 1.0, 0.0, 1.0);//outputs[0];
+    control.brake = outputs[1];//remap(outputs[1], -1.0, 1.0, 0.0, 1.0);//outputs[1];
     control.steer = outputs[2];
     
     

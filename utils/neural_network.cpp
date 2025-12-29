@@ -1,14 +1,25 @@
 #include "neural_network.hpp"
-#include <sstream>
-#include <cmath>
+
 
 // https://www.geeksforgeeks.org/machine-learning/ml-neural-network-implementation-in-c-from-scratch/
 
 
 // Activation functions
-Scalar activationFunction(Scalar x)
+Scalar activationFunction(Scalar x, bool use_relu)
 {
-    return tanhf(x);
+    if (use_relu){
+        // ReLU
+        if (x > 0)
+            return x;
+        else
+            return 0;
+    }
+    else{
+        // Tanh
+        return tanhf(x);
+    }
+
+    
 }
 
 NeuralNetwork::NeuralNetwork(std::vector<uint> topology, bool random_init, Scalar learningRate)
@@ -132,7 +143,7 @@ RowVector NeuralNetwork::propagateForward(RowVector& input)
 
         // Apply activation function to non-bias neurons
         for (uint j = 0; j < topology[i]; j++) {
-            neuronLayers[i]->coeffRef(j) = activationFunction(neuronLayers[i]->coeffRef(j));
+            neuronLayers[i]->coeffRef(j) = activationFunction(neuronLayers[i]->coeffRef(j), false);
         }
     }
 
