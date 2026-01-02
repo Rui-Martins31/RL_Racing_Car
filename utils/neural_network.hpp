@@ -9,6 +9,7 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include <random>
 
 // Types
 typedef float Scalar;

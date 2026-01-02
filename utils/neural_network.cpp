@@ -1,7 +1,7 @@
 #include "neural_network.hpp"
 
 // Constants
-#define SCALING_FACTOR_WEIGHTS 10
+#define SCALING_FACTOR_WEIGHTS 20
 
 
 // https://www.geeksforgeeks.org/machine-learning/ml-neural-network-implementation-in-c-from-scratch/
@@ -47,7 +47,15 @@ NeuralNetwork::NeuralNetwork(std::vector<uint> topology, bool random_init)
                 weights.push_back(new Matrix(topology[i - 1] + 1, topology[i] + 1));
                 if (random_init) {
                     weights.back()->setRandom();
-                    (*weights.back()) *= SCALING_FACTOR_WEIGHTS;
+                    //(*weights.back()) *= SCALING_FACTOR_WEIGHTS;
+                    // Create a random device and seed the generator
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+
+                    // Define distribution between 0.0 and NUM_NEURONS
+                    std::uniform_int_distribution<int> distr_int(0, topology[i]);
+
+                    weights.back()->coeffRef(distr_int(gen)) *= SCALING_FACTOR_WEIGHTS;
                 } else {
                     weights.back()->setZero();
                 }
@@ -58,7 +66,15 @@ NeuralNetwork::NeuralNetwork(std::vector<uint> topology, bool random_init)
                 weights.push_back(new Matrix(topology[i - 1] + 1, topology[i]));
                 if (random_init) {
                     weights.back()->setRandom();
-                    (*weights.back()) *= SCALING_FACTOR_WEIGHTS;
+                    //(*weights.back()) *= SCALING_FACTOR_WEIGHTS;
+                    // Create a random device and seed the generator
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+
+                    // Define distribution between 0.0 and NUM_NEURONS
+                    std::uniform_int_distribution<int> distr_int(0, topology[i]);
+
+                    weights.back()->coeffRef(distr_int(gen)) *= SCALING_FACTOR_WEIGHTS;
                 } else {
                     weights.back()->setZero();
                 }

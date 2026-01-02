@@ -307,10 +307,17 @@ void Generation::populate()
          agent_idx < this->AGENTS_NUM_TOTAL;
          agent_idx++)
     {
-        srand(time(0));
+        // Create a random device and seed the generator
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        // Define distribution between 0.0 and NUM_SURVIVORS
+        std::uniform_int_distribution<int> distr_int(0, this->AGENTS_NUM_SURVIVE);
+
+        std::uniform_real_distribution<float> distr_float(0.0, 1.0);
 
         // New Agent
-        float prob_new_agent = ((double)rand()) / RAND_MAX;
+        float prob_new_agent = distr_float(gen);
         if (prob_new_agent <= this->AGENT_PROB_NEW) {
             arr_agents.emplace_back(agent_idx);
             continue;
@@ -318,8 +325,8 @@ void Generation::populate()
 
         // Child
         std::vector<Scalar> weights_child;
-        int father_1_idx  = (int)(((double)rand()) / RAND_MAX)*this->AGENTS_NUM_SURVIVE;
-        int father_2_idx  = (int)(((double)rand()) / RAND_MAX)*this->AGENTS_NUM_SURVIVE;
+        int father_1_idx  = distr_int(gen);
+        int father_2_idx  = distr_int(gen);
         std::vector<Scalar> weights_father_1 
             = this->arr_agents[father_1_idx].nn.getWeights();
         std::vector<Scalar> weights_father_2
@@ -337,7 +344,7 @@ void Generation::populate()
                 weight_temp = weights_father_2[weight_idx];
 
             // Mutation
-            float prob_mutation  = ((double)rand()) / RAND_MAX;
+            float prob_mutation  = distr_float(gen);
             if (prob_mutation <= this->MUTATION_PROB) {
                 // FIX LATER SHOULDN'T JUST ADD BUT ALSO SUBTRACT
                 weight_temp += this->MUTATION_CHANGE;
