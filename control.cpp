@@ -43,12 +43,12 @@ int reward(bool out_of_bounds, float dist_raced)
 
 // Agent
 Agent::Agent(int agent_num)
-    : id(agent_num), reward(0.0f), nn(NN_TOPOLOGY, true, NN_LEARNING_RATE)
+    : id(agent_num), reward(0.0f), nn(NN_TOPOLOGY, true)
 {
 }
 
 Agent::Agent(int agent_num, float agent_reward, const std::vector<Scalar>& weights)
-    : id(agent_num), reward(agent_reward), nn(NN_TOPOLOGY, false, NN_LEARNING_RATE)
+    : id(agent_num), reward(agent_reward), nn(NN_TOPOLOGY, false)
 {
     this->nn.setWeights(weights);
 }
@@ -205,8 +205,7 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     // Neural Network
     NeuralNetwork nn(
         NN_TOPOLOGY,
-        true,
-        NN_LEARNING_RATE
+        true
     );
 
     // Inputs {vel, ang, pos}
@@ -219,8 +218,8 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     RowVector outputs = nn.propagateForward(inputs);
 
     // Output
-    control.accel = outputs[0];//remap(outputs[0], -1.0, 1.0, 0.0, 1.0);//outputs[0];
-    control.brake = outputs[1];//remap(outputs[1], -1.0, 1.0, 0.0, 1.0);//outputs[1];
+    control.accel = remap(outputs[0], -1.0, 1.0, 0.0, 1.0);//outputs[0];
+    control.brake = remap(outputs[1], -1.0, 1.0, 0.0, 1.0);//outputs[1];
     control.steer = outputs[2];
     
     

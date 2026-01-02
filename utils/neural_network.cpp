@@ -1,5 +1,8 @@
 #include "neural_network.hpp"
 
+// Constants
+#define SCALING_FACTOR_WEIGHTS 10
+
 
 // https://www.geeksforgeeks.org/machine-learning/ml-neural-network-implementation-in-c-from-scratch/
 
@@ -22,10 +25,9 @@ Scalar activationFunction(Scalar x, bool use_relu)
     
 }
 
-NeuralNetwork::NeuralNetwork(std::vector<uint> topology, bool random_init, Scalar learningRate)
+NeuralNetwork::NeuralNetwork(std::vector<uint> topology, bool random_init)
 {
     this->topology = topology;
-    this->learningRate = learningRate;
 
     for (uint i = 0; i < topology.size(); i++) {
         // Initialize neuron layers
@@ -45,6 +47,7 @@ NeuralNetwork::NeuralNetwork(std::vector<uint> topology, bool random_init, Scala
                 weights.push_back(new Matrix(topology[i - 1] + 1, topology[i] + 1));
                 if (random_init) {
                     weights.back()->setRandom();
+                    (*weights.back()) *= SCALING_FACTOR_WEIGHTS;
                 } else {
                     weights.back()->setZero();
                 }
@@ -55,6 +58,7 @@ NeuralNetwork::NeuralNetwork(std::vector<uint> topology, bool random_init, Scala
                 weights.push_back(new Matrix(topology[i - 1] + 1, topology[i]));
                 if (random_init) {
                     weights.back()->setRandom();
+                    (*weights.back()) *= SCALING_FACTOR_WEIGHTS;
                 } else {
                     weights.back()->setZero();
                 }
@@ -71,7 +75,7 @@ NeuralNetwork::~NeuralNetwork()
 
 // Copy constructor - deep copy
 NeuralNetwork::NeuralNetwork(const NeuralNetwork& other)
-    : learningRate(other.learningRate), topology(other.topology)
+    : topology(other.topology)
 {
     for (const auto* layer : other.neuronLayers) {
         neuronLayers.push_back(new RowVector(*layer));
@@ -92,7 +96,6 @@ NeuralNetwork& NeuralNetwork::operator=(const NeuralNetwork& other)
         weights.clear();
 
         // Copy data
-        learningRate = other.learningRate;
         topology = other.topology;
 
         for (const auto* layer : other.neuronLayers) {
@@ -109,7 +112,6 @@ NeuralNetwork& NeuralNetwork::operator=(const NeuralNetwork& other)
 NeuralNetwork::NeuralNetwork(NeuralNetwork&& other) noexcept
     : neuronLayers(std::move(other.neuronLayers)),
       weights(std::move(other.weights)),
-      learningRate(other.learningRate),
       topology(std::move(other.topology))
 {
 }
@@ -125,7 +127,6 @@ NeuralNetwork& NeuralNetwork::operator=(NeuralNetwork&& other) noexcept
         // Move data
         neuronLayers = std::move(other.neuronLayers);
         weights = std::move(other.weights);
-        learningRate = other.learningRate;
         topology = std::move(other.topology);
     }
     return *this;

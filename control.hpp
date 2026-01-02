@@ -39,13 +39,13 @@ class Generation
 {
 private:
     // Constants
-    const int AGENTS_NUM_TOTAL   = 25; // 50
-    const int AGENTS_NUM_SURVIVE = 10; // 25
+    const int AGENTS_NUM_TOTAL   = 50; // 50
+    const int AGENTS_NUM_SURVIVE = 25; // 25
 
     const float AGENT_PROB_NEW   = 0.25; // Probability of a new agent being born
 
     const float MUTATION_PROB    = 0.05; // Probability of occuring a mutation
-    const float MUTATION_CHANGE  = 0.1;
+    const float MUTATION_CHANGE  = 1.0;
 
     // Variables
     std::vector<Agent> arr_agents;

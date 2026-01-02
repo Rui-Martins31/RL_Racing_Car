@@ -24,7 +24,7 @@ public:
     // Constructor
     // random_init: true  = random weights
     //              false = zero weights
-    NeuralNetwork(std::vector<uint> topology, bool random_init = true, Scalar learningRate = Scalar(0.005));
+    NeuralNetwork(std::vector<uint> topology, bool random_init = true);
 
     // Copy constructor and assignment
     NeuralNetwork(const NeuralNetwork& other);
@@ -53,7 +53,6 @@ public:
     std::vector<RowVector*> neuronLayers; // stores the different layers of our network
     std::vector<Matrix*> weights;         // the connection weights
 
-    Scalar learningRate;
     std::vector<uint> topology;
 };
 
