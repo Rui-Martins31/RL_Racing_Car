@@ -219,7 +219,7 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
 
     // Output
     control.accel = remap(outputs[0], -1.0, 1.0, 0.0, 1.0);//outputs[0];
-    control.brake = remap(outputs[1], -1.0, 1.0, 0.0, 1.0);//outputs[1];
+    control.brake = remap(outputs[1], -1.0, 1.0, 0.0, 0.25);//outputs[1];
     control.steer = outputs[2];
     
     

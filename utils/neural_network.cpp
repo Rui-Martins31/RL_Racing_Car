@@ -48,14 +48,6 @@ NeuralNetwork::NeuralNetwork(std::vector<uint> topology, bool random_init)
                 if (random_init) {
                     weights.back()->setRandom();
                     //(*weights.back()) *= SCALING_FACTOR_WEIGHTS;
-                    // Create a random device and seed the generator
-                    std::random_device rd;
-                    std::mt19937 gen(rd());
-
-                    // Define distribution between 0.0 and NUM_NEURONS
-                    std::uniform_int_distribution<int> distr_int(0, topology[i]);
-
-                    weights.back()->coeffRef(distr_int(gen)) *= SCALING_FACTOR_WEIGHTS;
                 } else {
                     weights.back()->setZero();
                 }
@@ -67,20 +59,27 @@ NeuralNetwork::NeuralNetwork(std::vector<uint> topology, bool random_init)
                 if (random_init) {
                     weights.back()->setRandom();
                     //(*weights.back()) *= SCALING_FACTOR_WEIGHTS;
-                    // Create a random device and seed the generator
-                    std::random_device rd;
-                    std::mt19937 gen(rd());
-
-                    // Define distribution between 0.0 and NUM_NEURONS
-                    std::uniform_int_distribution<int> distr_int(0, topology[i]);
-
-                    weights.back()->coeffRef(distr_int(gen)) *= SCALING_FACTOR_WEIGHTS;
                 } else {
                     weights.back()->setZero();
                 }
             }
         }
     }
+
+    // Generator
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+
+    // Pick a random layer
+    std::uniform_int_distribution<int> layer_dist(0, weights.size() - 1);
+    int random_layer_idx = layer_dist(gen);
+
+    // Pick a random neuron
+    int max_index = weights[random_layer_idx]->size() - 1;
+    std::uniform_int_distribution<int> weight_dist(0, max_index);
+
+    // Scale the weight
+    weights[random_layer_idx]->coeffRef(weight_dist(gen)) *= SCALING_FACTOR_WEIGHTS;
 }
 
 NeuralNetwork::~NeuralNetwork()
