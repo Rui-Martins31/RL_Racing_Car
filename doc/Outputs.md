@@ -40,3 +40,6 @@ Generation:
 Neural Networks:
     - Topology: 3 (input), 3 (output)
     - All weights have values between -1 and 1 except for one of them that is scaled by 20.
+
+Control:
+    - Brake is limited to 25% of its intensity.
