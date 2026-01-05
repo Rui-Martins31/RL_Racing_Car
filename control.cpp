@@ -312,7 +312,7 @@ void Generation::populate()
         std::mt19937 gen(rd());
 
         // Define distribution between 0.0 and NUM_SURVIVORS
-        std::uniform_int_distribution<int> distr_int(0, this->AGENTS_NUM_SURVIVE);
+        std::uniform_int_distribution<int> distr_int(0, this->AGENTS_NUM_SURVIVE - 1);
 
         std::uniform_real_distribution<float> distr_float(0.0, 1.0);
 
