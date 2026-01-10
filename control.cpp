@@ -210,16 +210,17 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
 
     // Inputs {vel, ang, pos}
     RowVector inputs(3);
-    inputs[0] = velocity(message.speedX, message.speedY, message.speedZ), 0.0, 1.0;
-    inputs[1] = message.angle;
-    inputs[2] = message.trackPos;
+    float MAX_SPEED = 80.0;
+    inputs[0] = velocity(message.speedX, message.speedY, message.speedZ) / MAX_SPEED;
+    inputs[1] = remap(message.angle, -3.1416, 3.1416, 0.0, 0.1);
+    inputs[2] = remap(message.trackPos, -1.0, 1.0, 0.0, 1.0);
 
     // Forward {accel, brake, steer}
     RowVector outputs = nn.propagateForward(inputs);
 
     // Output
     control.accel = remap(outputs[0], -1.0, 1.0, 0.0, 1.0);//outputs[0];
-    control.brake = remap(outputs[1], -1.0, 1.0, 0.0, 0.25);//outputs[1];
+    control.brake = outputs[1] >= 0 ? remap(outputs[1], -1.0, 1.0, 0.0, 0.1) : 0.0;//remap(outputs[1], -1.0, 1.0, 0.0, 0.25);//outputs[1];
     control.steer = outputs[2];
     
     
