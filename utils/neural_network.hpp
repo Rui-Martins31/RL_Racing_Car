@@ -39,7 +39,7 @@ public:
     ~NeuralNetwork();
 
     // Forward pass
-    RowVector propagateForward(RowVector& input);
+    RowVector propagateForward(RowVector& input, bool use_relu);
 
     // Weight manipulation for evolutionary algorithm
     std::vector<Scalar> getWeights() const;

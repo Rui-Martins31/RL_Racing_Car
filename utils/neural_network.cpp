@@ -1,7 +1,7 @@
 #include "neural_network.hpp"
 
 // Constants
-#define SCALING_FACTOR_WEIGHTS 20
+#define SCALING_FACTOR_WEIGHTS 1
 
 
 // https://www.geeksforgeeks.org/machine-learning/ml-neural-network-implementation-in-c-from-scratch/
@@ -11,11 +11,16 @@
 Scalar activationFunction(Scalar x, bool use_relu)
 {
     if (use_relu){
-        // ReLU
-        if (x > 0)
-            return x;
+        // Modified ReLU
+        Scalar min_value = -1.0;
+        Scalar max_value = 1.0;
+
+        if (x < min_value)
+            return min_value;
+        else if (max_value < x)
+            return max_value;
         else
-            return 0;
+            return x;
     }
     else{
         // Tanh
@@ -147,7 +152,7 @@ NeuralNetwork& NeuralNetwork::operator=(NeuralNetwork&& other) noexcept
     return *this;
 }
 
-RowVector NeuralNetwork::propagateForward(RowVector& input)
+RowVector NeuralNetwork::propagateForward(RowVector& input, bool use_relu)
 {
     // Set the input to input layer (excluding bias neuron)
     neuronLayers.front()->block(0, 0, 1, neuronLayers.front()->size() - 1) = input;
@@ -159,7 +164,7 @@ RowVector NeuralNetwork::propagateForward(RowVector& input)
 
         // Apply activation function to non-bias neurons
         for (uint j = 0; j < topology[i]; j++) {
-            neuronLayers[i]->coeffRef(j) = activationFunction(neuronLayers[i]->coeffRef(j), false);
+            neuronLayers[i]->coeffRef(j) = activationFunction(neuronLayers[i]->coeffRef(j), use_relu);
         }
     }
 

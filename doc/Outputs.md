@@ -98,3 +98,29 @@ Neural Networks:
 Control:
     - Same as output_05.csv ...
     - angle and trackPos are remaped to [0.0, 1.0].
+
+### output_07.csv
+
+Generation: (Completely new species)
+    - 50 agents
+    - 25 survivors
+    - 25% probability of a new agent being born
+    - 5% occuring a mutation
+    - 0.1 change in weights in case of mutation
+
+Neural Networks:
+    - Topology: 3 (input), 3 (output)
+    - All weights have values between [-1.0, 1.0].
+    - Inputs:
+        - angle: [-1.0, 1.0]
+        - trackPos: [-1.0, 1.0]
+        - speed: [0.0, 1.0]
+    - Outputs:
+        - accel: [0.0, 1.0]
+        - brake: [0.0, 1.0]
+        - steer: [-1.0, 1.0]
+
+Control:
+    - angle and trackPos are back to [-1.0, 1.0].
+    - the activation function is now a modified ReLU. It basically clamps the output values to [-1.0, 1.0].
+    - Since all output values are now between [-1.0, 1.0], accel and brake are remaped to [0.0, 1.0].

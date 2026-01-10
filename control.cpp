@@ -203,26 +203,36 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     MessageClient control;
 
     // Neural Network
-    NeuralNetwork nn(
-        NN_TOPOLOGY,
-        true
-    );
+    NeuralNetwork& nn = this->arr_agents[this->agent_num_curr].nn;
 
     // Inputs {vel, ang, pos}
     RowVector inputs(3);
     float MAX_SPEED = 80.0;
     inputs[0] = velocity(message.speedX, message.speedY, message.speedZ) / MAX_SPEED;
-    inputs[1] = remap(message.angle, -3.1416, 3.1416, 0.0, 0.1);
-    inputs[2] = remap(message.trackPos, -1.0, 1.0, 0.0, 1.0);
+    inputs[1] = remap(message.angle, -3.1416, 3.1416, -1.0, 1.0);
+    inputs[2] = message.trackPos;//remap(message.trackPos, -1.0, 1.0, 0.0, 1.0);
+
+    // DEBUG
+    std::cout << "NN Input:\n" 
+              << "  Speed: "   << inputs[0]
+              << "  Angle: "   << inputs[1]
+              << "  Track Pos: "   << inputs[2]
+              << std::endl;
 
     // Forward {accel, brake, steer}
-    RowVector outputs = nn.propagateForward(inputs);
+    RowVector outputs = nn.propagateForward(inputs, true);
 
     // Output
-    control.accel = remap(outputs[0], -1.0, 1.0, 0.0, 1.0);//outputs[0];
-    control.brake = outputs[1] >= 0 ? remap(outputs[1], -1.0, 1.0, 0.0, 0.1) : 0.0;//remap(outputs[1], -1.0, 1.0, 0.0, 0.25);//outputs[1];
-    control.steer = outputs[2];
+    control.accel = remap(outputs[0], -1.0, 1.0, 0.0, 1.0);
+    control.brake = remap(outputs[1], -1.0, 1.0, 0.0, 1.0);
+    control.steer = outputs[2];//remap(outputs[2], 0.0, 1.0, -1.0, 1.0);
     
+    // DEBUG
+    std::cout << "NN Output:\n" 
+              << "  Accel: "   << outputs[0]
+              << "  Brake: "   << outputs[1]
+              << "  Sterr: "   << outputs[2]
+              << std::endl;
     
     // DO NOT CHANGE ----
     control.clutch = 0.0;
@@ -347,8 +357,11 @@ void Generation::populate()
             // Mutation
             float prob_mutation  = distr_float(gen);
             if (prob_mutation <= this->MUTATION_PROB) {
-                // FIX LATER SHOULDN'T JUST ADD BUT ALSO SUBTRACT
-                weight_temp += this->MUTATION_CHANGE;
+                // Add os subtracts to the weight
+                if (prob_mutation <= this->MUTATION_PROB / 2)
+                    weight_temp -= this->MUTATION_CHANGE;
+                else
+                    weight_temp += this->MUTATION_CHANGE;
             }
 
             weights_child.emplace_back(weight_temp);

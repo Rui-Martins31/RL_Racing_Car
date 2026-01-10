@@ -13,11 +13,13 @@
 int test_01(int result, bool debug);
 int test_02(bool debug);
 int test_03(bool debug);
+int test_04(bool debug);
 
 int main(){
     test_01(70, DEBUG);
     test_02(DEBUG);
     test_03(DEBUG);
+    test_04(DEBUG);
 
     return 0;
 }
@@ -30,8 +32,7 @@ int test_01(int result, bool debug) {
 
     NeuralNetwork test_nn(
         TOPOLOGY,
-        true,
-        0.005
+        true
     );
 
     // Weights
@@ -61,8 +62,7 @@ int test_02(bool debug) {
 
     NeuralNetwork test_nn(
         TOPOLOGY,
-        true,
-        0.005
+        true
     );
 
     // Test variables
@@ -95,6 +95,33 @@ int test_03(bool debug) {
     std::cout << "Current agent number: "      << gen.get_current_agent_num()      << std::endl;
     std::cout << "Current generation number: " << gen.get_current_generation_num() << std::endl;
     std::cout << "Current weight: " << gen.get_weights_from_agent(0)[0]  << std::endl;
+
+    return 1;
+}
+
+// Test Neural Network
+int test_04(bool debug) {
+    if (debug)
+        std::cout << " -- Test 4 -- " << std::endl;
+
+    NeuralNetwork nn(
+        TOPOLOGY,
+        true
+    );
+
+    // Random input values
+    RowVector inputs(3);
+    float MAX_SPEED = 80.0;
+    inputs[0] /*vel*/ = 0.0;
+    inputs[1] /*ang*/ = 1.0;
+    inputs[2] /*pos*/ = 1.0;
+
+    // Forward {accel, brake, steer}
+    RowVector outputs = nn.propagateForward(inputs, true);
+    std::cout << " Accel: " << outputs[0]
+              << " Brake: " << outputs[1]
+              << " Steer: " << outputs[2]
+              << std::endl;
 
     return 1;
 }
