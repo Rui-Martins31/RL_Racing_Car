@@ -5,9 +5,11 @@
 #define DEBUG false
 #define PATH_OUTPUT "output.csv"
 #define EPISODE_MAX 1000
+#define DISTANCE_MIN 300
+
+#define MAX_SPEED 83.0
 
 #define NN_TOPOLOGY {3, 3} // {3, 3, 3}
-#define NN_LEARNING_RATE 0.005
 
 
 // Auxiliary Functions
@@ -207,7 +209,6 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
 
     // Inputs {vel, ang, pos}
     RowVector inputs(3);
-    float MAX_SPEED = 80.0;
     inputs[0] = velocity(message.speedX, message.speedY, message.speedZ) / MAX_SPEED;
     inputs[1] = remap(message.angle, -3.1416, 3.1416, -1.0, 1.0);
     inputs[2] = message.trackPos;//remap(message.trackPos, -1.0, 1.0, 0.0, 1.0);
@@ -242,7 +243,9 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     // Check if car is out of track
     // or if it's the end of episode
     bool out_of_bounds  = (message.trackPos < -1.0 || message.trackPos > 1.0);
-    bool end_of_episode = (episode_cycles % EPISODE_MAX == 0);
+    bool end_of_episode = 
+        (episode_cycles % EPISODE_MAX == 0) &&
+        (message.distRaced / ((float)DISTANCE_MIN * episode_cycles / EPISODE_MAX) < 1.0);
     if (out_of_bounds || end_of_episode) {
         control.meta = true;
 

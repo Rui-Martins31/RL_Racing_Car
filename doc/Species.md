@@ -52,7 +52,7 @@ Neural Networks:
         - steer: [-1.0, 1.0]
 
 Notes: 
-    - The first generation of this Species is the same as the last generation of [Species 1]
+    - The first generation of this Species is the same as the last generation of [Species 1](#species-1)
     - Log: output/output_08.csv
 
 ---
