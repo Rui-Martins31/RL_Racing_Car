@@ -44,8 +44,8 @@ private:
 
     const float AGENT_PROB_NEW   = 0.25; // Probability of a new agent being born
 
-    const float MUTATION_PROB    = 0.05; // Probability of occuring a mutation
-    const float MUTATION_CHANGE  = 0.1;
+    const float MUTATION_PROB    = 0.3; // Probability of occuring a mutation
+    const float MUTATION_CHANGE  = 0.2;
 
     // Variables
     std::vector<Agent> arr_agents;
