@@ -30,6 +30,7 @@ MessageServer parse_message_from_server(const char* message)
     message_parsed.speedZ   = get_key(message, "(speedZ ");
 
     message_parsed.distRaced = get_key(message, "(distRaced ");
+    message_parsed.lastLapTime = get_key(message, "(lastLapTime ");
     
     // DEBUG
     if (DEBUG)
@@ -41,6 +42,7 @@ MessageServer parse_message_from_server(const char* message)
                 << "\n  Speed Y:" << message_parsed.speedY
                 << "\n  Speed Z:" << message_parsed.speedZ
                 << "\n  Dist Raced:" << message_parsed.distRaced
+                << "\n  Last Lap Time:" << message_parsed.lastLapTime
                 << std::endl;
     }
 

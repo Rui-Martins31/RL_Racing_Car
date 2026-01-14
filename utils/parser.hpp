@@ -21,6 +21,8 @@ struct MessageServer
 
     // Variables for reward computation
     float distRaced;
+    float curLapTime;
+    float lastLapTime;
 }; // This vars are enough for now
 
 struct MessageClient
