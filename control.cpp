@@ -24,14 +24,14 @@ float remap(float value, float original_min, float original_max,
     return new_min + (value - original_min) * (new_max - new_min) / (original_max - original_min);
 }
 
-int reward(bool out_of_bounds, float dist_raced)
+int reward(bool out_of_bounds, float dist_raced, float last_lap_time)
 {
     /*
     Rewards:
         - Out of bounds: -10
-        - Complete lap: +10
+        - Complete lap: +10000
         - Distance raced: +10 * distance
-        - Fastest lap: +5
+        - Fastest lap: +5000
     */
 
     // Reward
@@ -39,6 +39,7 @@ int reward(bool out_of_bounds, float dist_raced)
 
     if (out_of_bounds) reward_total += -10;
     reward_total += 10 * dist_raced;
+    if (last_lap_time != 0.0) reward_total += 10000;
 
     return reward_total;
 }
@@ -246,13 +247,15 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     bool end_of_episode = 
         (episode_cycles % EPISODE_MAX == 0) &&
         (message.distRaced / ((float)DISTANCE_MIN * episode_cycles / EPISODE_MAX) < 1.0);
-    if (out_of_bounds || end_of_episode) {
+    bool end_of_lap     = (message.lastLapTime != 0.0);
+    if (out_of_bounds || end_of_episode || end_of_lap) {
         control.meta = true;
 
         // Store weights
         int final_reward = reward(
             out_of_bounds,
-            message.distRaced
+            message.distRaced,
+            message.lastLapTime
         );
         this->arr_agents[this->agent_num_curr].nn.saveToCSV(
             PATH_OUTPUT,

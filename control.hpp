@@ -14,7 +14,7 @@
 
 // Auxiliary functions
 float velocity(float vel_x, float vel_y, float vel_z);
-int reward(bool out_of_bounds, float dist_raced);
+int reward(bool out_of_bounds, float dist_raced, float last_lap_time);
 float remap(float value, float original_min, float original_max,
                          float new_min, float new_max);
 

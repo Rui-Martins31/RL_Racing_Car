@@ -26,6 +26,10 @@ Neural Networks:
         - brake: [-1.0, 1.0] -> remap [0.0, 1.0]
         - steer: [-1.0, 1.0]
 
+Reward:
+    - Distance Raced: distRaced * 10
+    - Out of bounds: -10
+
 Notes:
     - First generation is completely random.
     - Log: output/output_07.csv
@@ -50,6 +54,10 @@ Neural Networks:
         - accel: [-1.0, 1.0] -> remap [0.0, 1.0]
         - brake: [-1.0, 1.0] -> remap [0.0, 1.0]
         - steer: [-1.0, 1.0]
+
+Reward:
+    - Distance Raced: distRaced * 10
+    - Out of bounds: -10
 
 Notes: 
     - The first generation of this Species is the same as the last generation of [Species 1](#species-1)
@@ -81,7 +89,13 @@ Neural Networks:
         - brake: [-1.0, 1.0] -> remap [0.0, 1.0]
         - steer: [-1.0, 1.0]
 
+Reward:
+    - Distance Raced: distRaced * 10
+    - Out of bounds: -10
+    - Complete lap: 10000
+
 Notes:
     - First generation based on the [Species 2](#species-2)
     - Agents are no longer limited to 1000 cycles (20 seconds) per episode.
+    - Reward based on lap completion.
     - Log: output/output_09.csv
