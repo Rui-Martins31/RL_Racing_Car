@@ -19,6 +19,15 @@ struct MessageServer
     float speedY;
     float speedZ;
 
+    // RPMs
+    float rpm;
+    float gear;
+
+    // Sensors
+    float sensor_left;
+    float sensor_middle;
+    float sensor_right;
+
     // Variables for reward computation
     float distRaced;
     float curLapTime;
@@ -31,10 +40,10 @@ struct MessageClient
     float accel;
     float brake;
     float steer;
+    int gear;
+    float clutch;
 
     // 
-    float clutch;
-    int gear;
     float focus;
     bool meta;
 };

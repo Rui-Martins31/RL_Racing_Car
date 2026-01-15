@@ -1,15 +1,19 @@
 // Custom scripts
 #include "control.hpp"
+#include <cmath>
 
 // Globals
 #define DEBUG false
 #define PATH_OUTPUT "output.csv"
+
 #define EPISODE_MAX 1000
 #define DISTANCE_MIN 300
+#define RPM_MAX 10000
+#define SENSOR_MAX 200
 
 #define MAX_SPEED 83.0
 
-#define NN_TOPOLOGY {3, 3} // {3, 3, 3}
+#define NN_TOPOLOGY {8, 4}
 
 
 // Auxiliary Functions
@@ -208,38 +212,69 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     // Neural Network
     NeuralNetwork& nn = this->arr_agents[this->agent_num_curr].nn;
 
-    // Inputs {vel, ang, pos}
-    RowVector inputs(3);
+    // Inputs {vel, ang, pos, rpm, s_left, s_mid, s_right}
+    RowVector inputs(8);
     inputs[0] = velocity(message.speedX, message.speedY, message.speedZ) / MAX_SPEED;
     inputs[1] = remap(message.angle, -3.1416, 3.1416, -1.0, 1.0);
-    inputs[2] = message.trackPos;//remap(message.trackPos, -1.0, 1.0, 0.0, 1.0);
+    inputs[2] = message.trackPos;
+    inputs[3] = remap(message.rpm, 0.0, RPM_MAX, 0.0, 1.0);
+    inputs[4] = remap(message.gear, -1.0, 6.0, -1.0, 1.0);
+    inputs[5] = remap(message.sensor_left, 0.0, SENSOR_MAX, 0.0, 1.0);
+    inputs[6] = remap(message.sensor_middle, 0.0, SENSOR_MAX, 0.0, 1.0);
+    inputs[7] = remap(message.sensor_right, 0.0, SENSOR_MAX, 0.0, 1.0);
 
     // DEBUG
     std::cout << "NN Input:\n" 
               << "  Speed: "   << inputs[0]
               << "  Angle: "   << inputs[1]
               << "  Track Pos: "   << inputs[2]
+              << "  RPM: "   << inputs[3]
+              << "  Gear Curr: "   << inputs[4]
+              << "  Sensor Left: "   << inputs[5]
+              << "  Sensor Middle: "   << inputs[6]
+              << "  Sensor Right: "   << inputs[7]
               << std::endl;
 
-    // Forward {accel, brake, steer}
+    // Forward {accel, brake, steer, gear}
     RowVector outputs = nn.propagateForward(inputs, true);
 
     // Output
     control.accel = remap(outputs[0], -1.0, 1.0, 0.0, 1.0);
     control.brake = remap(outputs[1], -1.0, 1.0, 0.0, 1.0);
-    control.steer = outputs[2];//remap(outputs[2], 0.0, 1.0, -1.0, 1.0);
+    control.steer = outputs[2];
+
+    int gear_change = (int)round(tanh(outputs[3]));
+    switch (gear_change) {
+        case -1:
+            if ((int)message.gear != -1)
+                control.gear   = (int)message.gear - 1;
+            control.clutch = 1.0;
+            break;
+        case 0:
+            control.gear   = (int)message.gear;
+            control.clutch = 0.0;
+            break;
+        case 1:
+            if ((int)message.gear != 6)
+                control.gear   = (int)message.gear + 1;
+            control.clutch = 1.0;
+            break;
+    }
     
     // DEBUG
     std::cout << "NN Output:\n" 
               << "  Accel: "   << outputs[0]
               << "  Brake: "   << outputs[1]
-              << "  Sterr: "   << outputs[2]
+              << "  Steer: "   << outputs[2]
+              << "  Gear Change: "   << gear_change//outputs[3]
+              << "  Gear: "   << control.gear
+              << "  Clutch: "   << control.clutch
               << std::endl;
     
     // DO NOT CHANGE ----
-    control.clutch = 0.0;
+    //control.clutch = 0.0;
+    //control.gear   = 1;
     control.focus  = 0.0;
-    control.gear   = 1;
     
     // Check if car is out of track
     // or if it's the end of episode

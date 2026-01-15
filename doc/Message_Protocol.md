@@ -60,3 +60,27 @@ Message from client:
     (focus <float>)
     (meta <bool>)
 ```
+
+---
+
+# Sensors
+
+trackSensAngle[0] -90
+trackSensAngle[1] -80
+trackSensAngle[2] -70
+trackSensAngle[3] -60
+trackSensAngle[4] -50
+trackSensAngle[5] -40
+trackSensAngle[6] -30
+trackSensAngle[7] -20
+trackSensAngle[8] -10
+trackSensAngle[9]  0
+trackSensAngle[10] 10
+trackSensAngle[11] 20
+trackSensAngle[12] 30
+trackSensAngle[13] 40
+trackSensAngle[14] 50
+trackSensAngle[15] 60
+trackSensAngle[16] 70
+trackSensAngle[17] 80
+trackSensAngle[18] 90
