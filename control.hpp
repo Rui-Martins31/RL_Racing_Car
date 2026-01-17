@@ -26,6 +26,7 @@ public:
     NeuralNetwork nn;
     int id;
     float reward;
+    MessageClient previous_message;
 
     // Methods
     Agent(int agent_num);

@@ -15,6 +15,11 @@
 
 #define NN_TOPOLOGY {8, 4}
 
+#define REWARD_RPM_MAX RPM_MAX*0.8
+#define REWARD_RPM_MIN RPM_MAX*0.2
+#define REWARD_MIN_STEER_DIFF 0.1
+#define REWARD_MIN_EPISODE_CYCLES_TO_SHIFT 500
+
 
 // Auxiliary Functions
 float velocity(float vel_x, float vel_y, float vel_z)
@@ -28,7 +33,7 @@ float remap(float value, float original_min, float original_max,
     return new_min + (value - original_min) * (new_max - new_min) / (original_max - original_min);
 }
 
-int reward(bool out_of_bounds, float dist_raced, float last_lap_time)
+int reward(bool out_of_bounds, float dist_raced, int episode_cycles, float last_lap_time)
 {
     /*
     Rewards:
@@ -43,6 +48,8 @@ int reward(bool out_of_bounds, float dist_raced, float last_lap_time)
 
     if (out_of_bounds) reward_total += -10;
     reward_total += 10 * dist_raced;
+    reward_total += (dist_raced / ((float)DISTANCE_MIN * episode_cycles / EPISODE_MAX)) * 100;
+
     if (last_lap_time != 0.0) reward_total += 10000;
 
     return reward_total;
@@ -50,12 +57,12 @@ int reward(bool out_of_bounds, float dist_raced, float last_lap_time)
 
 // Agent
 Agent::Agent(int agent_num)
-    : id(agent_num), reward(0.0f), nn(NN_TOPOLOGY, true)
+    : id(agent_num), reward(0.0f), nn(NN_TOPOLOGY, true), previous_message{}
 {
 }
 
 Agent::Agent(int agent_num, float agent_reward, const std::vector<Scalar>& weights)
-    : id(agent_num), reward(agent_reward), nn(NN_TOPOLOGY, false)
+    : id(agent_num), reward(agent_reward), nn(NN_TOPOLOGY, false), previous_message{}
 {
     this->nn.setWeights(weights);
 }
@@ -194,7 +201,7 @@ bool Generation::load_last_complete_generation(const std::string& filepath)
     int count = 0;
     for (const auto& agent : last_gen_agents) {
         if (count >= AGENTS_NUM_SURVIVE) break;
-        this->arr_agents.emplace_back(count, agent.reward, agent.weights);
+        this->arr_agents.emplace_back(count, /*agent.reward*/ 0.0, agent.weights);
         count++;
     }
 
@@ -242,22 +249,67 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     control.accel = remap(outputs[0], -1.0, 1.0, 0.0, 1.0);
     control.brake = remap(outputs[1], -1.0, 1.0, 0.0, 1.0);
     control.steer = outputs[2];
+    if(
+        abs(
+            abs(this->arr_agents[this->agent_num_curr].previous_message.steer)
+            -
+            abs(control.steer)
+        )
+        >=
+        REWARD_MIN_STEER_DIFF
+    ) this->arr_agents[this->agent_num_curr].reward += -10; // Penalize in case it starts to steer in random directions
 
-    int gear_change = (int)round(tanh(outputs[3]));
+    int gear_change = (int)round(outputs[3]);//tanh(outputs[3]));
     switch (gear_change) {
         case -1:
-            if ((int)message.gear != -1)
+            // Reward based on RPM
+            if (message.rpm >= REWARD_RPM_MAX)
+                this->arr_agents[this->agent_num_curr].reward += -10;
+            else
+                this->arr_agents[this->agent_num_curr].reward += 10;
+
+            if (episode_cycles <= REWARD_MIN_EPISODE_CYCLES_TO_SHIFT)
+                this->arr_agents[this->agent_num_curr].reward += -10;
+
+            // Control clutch and gear
+            if ((int)message.gear != -1){
                 control.gear   = (int)message.gear - 1;
-            control.clutch = 1.0;
+                control.clutch = 1.0;
+            } else {
+                this->arr_agents[this->agent_num_curr].reward -= 10;
+            }
+
             break;
         case 0:
+            // Reward based on RPM
+            if (message.rpm >= REWARD_RPM_MAX)
+                this->arr_agents[this->agent_num_curr].reward += -10;
+            if (message.rpm <= REWARD_RPM_MIN && episode_cycles >= REWARD_MIN_EPISODE_CYCLES_TO_SHIFT)
+                this->arr_agents[this->agent_num_curr].reward += -10;
+
+            // Control
             control.gear   = (int)message.gear;
             control.clutch = 0.0;
+            
             break;
         case 1:
-            if ((int)message.gear != 6)
+            // Reward based on RPM
+            if (message.rpm >= REWARD_RPM_MAX)
+                this->arr_agents[this->agent_num_curr].reward += 10;
+            else
+                this->arr_agents[this->agent_num_curr].reward += -10;
+
+            if (episode_cycles <= REWARD_MIN_EPISODE_CYCLES_TO_SHIFT)
+                this->arr_agents[this->agent_num_curr].reward += -10;
+            
+            // Control
+            if ((int)message.gear != 6){
                 control.gear   = (int)message.gear + 1;
-            control.clutch = 1.0;
+                control.clutch = 1.0;
+            } else {
+                this->arr_agents[this->agent_num_curr].reward += -10;
+            }
+
             break;
     }
     
@@ -270,6 +322,7 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
               << "  Gear: "   << control.gear
               << "  Clutch: "   << control.clutch
               << std::endl;
+
     
     // DO NOT CHANGE ----
     //control.clutch = 0.0;
@@ -290,8 +343,10 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
         int final_reward = reward(
             out_of_bounds,
             message.distRaced,
+            episode_cycles,
             message.lastLapTime
-        );
+        ) + this->arr_agents[this->agent_num_curr].reward;
+
         this->arr_agents[this->agent_num_curr].nn.saveToCSV(
             PATH_OUTPUT,
             this->generation_num_curr,
@@ -302,6 +357,10 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
         this->update((float)final_reward);
     }
     else control.meta = false;
+
+    // Update
+    this->arr_agents[this->agent_num_curr].previous_message = control;
+
     // DO NOT CHANGE ----
 
     // DEBUG 
