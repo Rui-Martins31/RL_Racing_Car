@@ -1,6 +1,8 @@
 // Custom scripts
 #include "control.hpp"
 #include <cmath>
+#include <iostream>
+#include <ostream>
 
 // Globals
 #define DEBUG false
@@ -38,9 +40,9 @@ int reward(bool out_of_bounds, float dist_raced, int episode_cycles, float last_
     /*
     Rewards:
         - Out of bounds: -10
-        - Complete lap: +10000
         - Distance raced: +10 * distance
-        - Fastest lap: +5000
+        - Fast lap: distRaced/(predicted distRaced in that time) * 10
+        - Complete lap: +10000
     */
 
     // Reward
@@ -48,9 +50,12 @@ int reward(bool out_of_bounds, float dist_raced, int episode_cycles, float last_
 
     if (out_of_bounds) reward_total += -10;
     reward_total += 10 * dist_raced;
-    reward_total += (dist_raced / ((float)DISTANCE_MIN * episode_cycles / EPISODE_MAX)) * 100;
+    reward_total += (int)(dist_raced / ((float)DISTANCE_MIN * episode_cycles / EPISODE_MAX)) * 10;
 
     if (last_lap_time != 0.0) reward_total += 10000;
+
+    // DEBUG 
+    //std::cout << "Reward (func): " << reward_total << std::endl;
 
     return reward_total;
 }
@@ -263,7 +268,7 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
     switch (gear_change) {
         case -1:
             // Reward based on RPM
-            if (message.rpm >= REWARD_RPM_MAX)
+            if ( (message.rpm >= REWARD_RPM_MAX) || ((int)message.gear == -1) )
                 this->arr_agents[this->agent_num_curr].reward += -10;
             else
                 this->arr_agents[this->agent_num_curr].reward += 10;
@@ -276,7 +281,7 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
                 control.gear   = (int)message.gear - 1;
                 control.clutch = 1.0;
             } else {
-                this->arr_agents[this->agent_num_curr].reward -= 10;
+                this->arr_agents[this->agent_num_curr].reward += -10;
             }
 
             break;
@@ -294,7 +299,7 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
             break;
         case 1:
             // Reward based on RPM
-            if (message.rpm >= REWARD_RPM_MAX)
+            if ( (message.rpm >= REWARD_RPM_MAX) && ((int)message.gear != 6) )
                 this->arr_agents[this->agent_num_curr].reward += 10;
             else
                 this->arr_agents[this->agent_num_curr].reward += -10;
@@ -307,7 +312,7 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
                 control.gear   = (int)message.gear + 1;
                 control.clutch = 1.0;
             } else {
-                this->arr_agents[this->agent_num_curr].reward += -10;
+                this->arr_agents[this->agent_num_curr].reward += -1;
             }
 
             break;
@@ -322,6 +327,7 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
               << "  Gear: "   << control.gear
               << "  Clutch: "   << control.clutch
               << std::endl;
+    std::cout << "Reward: " << this->arr_agents[this->agent_num_curr].reward << std::endl;
 
     
     // DO NOT CHANGE ----
@@ -355,6 +361,9 @@ MessageClient Generation::step(int episode_cycles, MessageServer message)
 
         // Update
         this->update((float)final_reward);
+
+        // DEBUG 
+        std::cout << "Final Reward: " << final_reward << std::endl;
     }
     else control.meta = false;
 
@@ -410,6 +419,11 @@ void Generation::populate()
             this->arr_agents.begin() + this->AGENTS_NUM_SURVIVE, 
             this->arr_agents.end()
         );
+
+        // Reset their rewards
+        for (auto& agent : this->arr_agents) {
+            agent.reward = 0.0;
+        }
     }
 
     // Mutate and randomize new agents

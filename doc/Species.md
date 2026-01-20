@@ -173,7 +173,7 @@ Neural Networks:
 Reward:
     - Distance Raced: distRaced * 10
     - Out of bounds: -10
-    - Fastest: distRaced/(predicted distRaced in that time) * 100
+    - Fastest: distRaced/(predicted distRaced in that time) * 10
     - Complete lap: 10000
     - Improperly shifted gears: -10
     - Properly shifted gears: 10

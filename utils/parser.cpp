@@ -51,9 +51,9 @@ MessageServer parse_message_from_server(const char* message)
     message_parsed.gear     = get_key(message, "(gear ");
 
     std::vector<float> sensor_readings = get_track_sensors(message);
-    message_parsed.sensor_left   = sensor_readings[8];
+    message_parsed.sensor_left   = sensor_readings[6];
     message_parsed.sensor_middle = sensor_readings[9];
-    message_parsed.sensor_right  = sensor_readings[10];
+    message_parsed.sensor_right  = sensor_readings[12];
 
     message_parsed.distRaced   = get_key(message, "(distRaced ");
     message_parsed.lastLapTime = get_key(message, "(lastLapTime ");
