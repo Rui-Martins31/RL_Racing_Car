@@ -1,138 +1,173 @@
 #include <iostream>
 #include <string>
-#include <vector>
 #include <cstring>
-#include <cmath>
-#include <arpa/inet.h> // For sockets (Linux/macOS)
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <signal.h>
+#include <cerrno>
 
-// Custom scripts
 #include "utils/parser.hpp"
 #include "control.hpp"
 
-// Globals
-const char* SERVER_IP    = "127.0.0.1";
-const int SERVER_PORT    = 3001;
-const int SOCKET_TIMEOUT = 3;
-const int BUFFER_SIZE    = 4096;
-const int MAX_STEPS      = 0;
+#define SERVER_IP "127.0.0.1"
+#define SERVER_PORT 3001
+#define BUFFER_SIZE 4096
+#define SOCKET_TIMEOUT 3
 
-bool handshake(int sockfd, sockaddr_in servaddr)
+volatile bool running = true;
+
+void signal_handler(int signum)
 {
-    std::cout << "Sending..." << std::endl;
-    // Send
-    std::string init_str = "SCR init";
-    sendto(sockfd, init_str.c_str(), init_str.length(), 0, 
-            (const struct sockaddr *) &servaddr, sizeof(servaddr));
+    std::cout << "\n[CLIENT] Shutdown signal received..." << std::endl;
+    running = false;
+}
 
-    std::cout << "Receiving..." << std::endl;
-    // Receive
-    char message[BUFFER_SIZE];
-    int n_chars = recv(sockfd, message, sizeof(message), 0);
-    message[n_chars] = '\0';
+bool handshake(int sockfd, sockaddr_in& servaddr)
+{
+    std::string init = "SCR init";
+    sendto(sockfd, init.c_str(), init.size(), 0,
+           (sockaddr*)&servaddr, sizeof(servaddr));
 
-    std::cout << "Returning..." << std::endl;
-    std::cout << message << std::endl;
-    
-    if (strcmp(message, "***identified***") == 0) return true;
-    else return false;
+    char buf[BUFFER_SIZE];
+    int n = recv(sockfd, buf, sizeof(buf) - 1, 0);
+    if (n <= 0) return false;
+
+    buf[n] = '\0';
+    return std::strcmp(buf, "***identified***") == 0;
 }
 
 int main()
 {
-    // DEBUG
-    std::cout << "Starting client..." << std::endl;
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
 
-    // Create UDP Socket
-    int sockfd;
-    struct sockaddr_in servaddr;
+    std::cout << "========================================" << std::endl;
+    std::cout << "Starting TORCS client (PPO)" << std::endl;
+    std::cout << "========================================" << std::endl;
 
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("Socket creation failed");
-        return -1;
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        std::cerr << "[CLIENT] Error creating socket" << std::endl;
+        return 1;
     }
 
-    struct timeval timeout;
-    timeout.tv_sec  = SOCKET_TIMEOUT;
-    timeout.tv_usec = 0;
-
-    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-        perror("setsockopt failed");
+    sockaddr_in servaddr{};
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(SERVER_PORT);
+    
+    if (inet_pton(AF_INET, SERVER_IP, &servaddr.sin_addr) <= 0) {
+        std::cerr << "[CLIENT] Invalid server IP address" << std::endl;
         close(sockfd);
         return 1;
     }
 
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(SERVER_PORT);
-    if (inet_pton(AF_INET, SERVER_IP, &servaddr.sin_addr) <= 0) {
-        perror("Invalid address");
-        return -1;
+    timeval tv{SOCKET_TIMEOUT, 0};
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    std::cout << "[CLIENT] Connecting to TORCS server at " 
+              << SERVER_IP << ":" << SERVER_PORT << "..." << std::endl;
+
+    int handshake_attempts = 0;
+    while (!handshake(sockfd, servaddr) && running)
+    {
+        std::cout << "." << std::flush;
+        handshake_attempts++;
+        
+        if (handshake_attempts > 30) {
+            std::cerr << "\n[CLIENT] Handshake failed after 30 attempts" << std::endl;
+            close(sockfd);
+            return 1;
+        }
+        
+        sleep(1);
     }
 
-    // Intial handshake
-    while (!handshake(sockfd, servaddr)) {std::cout << ".";}
+    if (!running) {
+        std::cout << "[CLIENT] Interrupted during handshake" << std::endl;
+        close(sockfd);
+        return 0;
+    }
 
-
-    // DEBUG
-    std::cout << "Connected to TORCS server..." << std::endl;
-    std::cout << "Receveiving feedback from TORCS server...\n" << std::endl;
+    std::cout << "\n[CLIENT] Connected to TORCS server!" << std::endl;
+    std::cout << "========================================" << std::endl;
 
     char message[BUFFER_SIZE];
-    socklen_t len = sizeof(servaddr);
-
-    // Loop
-    Generation gen;
-    float episode_num  = 1;
     int episode_cycles = 1;
-    while (true)
-    {        
-        // Receive message
-        int n_chars      = recv(sockfd, message, sizeof(message), 0);
-        message[n_chars] = '\0';
+    int total_episodes = 0;
+    int total_steps = 0;
 
-        if (strcmp(message, "***restart***") == 0) 
-        {
-            std::cout << "Restarting..." << std::endl;
-
-            // Restart
-            while (true) {
-                bool handshake_result = handshake(sockfd, servaddr);
-                if (handshake_result) break;
-
-                std::cout << ".";
+    while (running)
+    {
+        int n = recv(sockfd, message, sizeof(message) - 1, 0);
+        
+        if (n < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
             }
-            episode_num   += 0.5;
-            episode_cycles = 1;
+            std::cerr << "[CLIENT] Recv error: " << strerror(errno) << std::endl;
+            break;
+        }
+        
+        if (n == 0) {
+            std::cout << "[CLIENT] Server closed connection" << std::endl;
+            break;
+        }
+        
+        message[n] = '\0';
 
+        if (std::strcmp(message, "***restart***") == 0)
+        {
+            std::cout << "[CLIENT] Episode " << total_episodes
+                      << " restart (lasted " << episode_cycles << " steps)" << std::endl;
+
+            // MANDATORY: re-handshake with TORCS
+            while (!handshake(sockfd, servaddr))
+            {
+                std::cout << "." << std::flush;
+            }
+
+            episode_cycles = 1;
+            total_episodes++;
             continue;
         }
 
-        // DEBUG
-        // std::cout << "Message from client: " << message << std::endl;
-        // std::cout << "Episode num: " << episode_num << std::endl;
+        if (std::strcmp(message, "***shutdown***") == 0)
+        {
+            std::cout << "[CLIENT] Shutdown requested by server" << std::endl;
+            running = false;
+            break;
+        }
 
-        // Parse server message
-        MessageServer message_parsed  = parse_message_from_server(message);
+        MessageServer obs = parse_message_from_server(message);
+        MessageClient act = step(episode_cycles, obs);
 
-        // Control
-        // MessageClient message_control = control((int)episode_num, episode_cycles, message_parsed);
-        MessageClient message_control = gen.step(episode_cycles, message_parsed);
+        std::string out = parse_message_from_client(act);
+        ssize_t sent = sendto(sockfd, out.c_str(), out.size(), 0,
+                              (sockaddr*)&servaddr, sizeof(servaddr));
+        
+        if (sent < 0) {
+            std::cerr << "[CLIENT] Send error: " << strerror(errno) << std::endl;
+            break;
+        }
 
-        // Create client message
-        std::string response = parse_message_from_client(message_control);
-
-        // Send control message
-        sendto(sockfd, response.c_str(), response.length(), 0,
-                (const struct sockaddr *) &servaddr, sizeof(servaddr));
-
-        // Update
-        episode_cycles += 1;
+        episode_cycles++;
+        total_steps++;
+        
+        if (total_steps % 1000 == 0) {
+            std::cout << "[CLIENT] Total steps: " << total_steps 
+                      << ", Episodes: " << total_episodes << std::endl;
+        }
     }
 
-    // Close socket
-    close(sockfd);
+    std::cout << "\n========================================" << std::endl;
+    std::cout << "[CLIENT] Shutting down..." << std::endl;
+    std::cout << "Total episodes: " << total_episodes << std::endl;
+    std::cout << "Total steps: " << total_steps << std::endl;
+    std::cout << "========================================" << std::endl;
 
+    cleanup_ppo();
+    close(sockfd);
+    
     return 0;
 }

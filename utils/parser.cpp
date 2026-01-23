@@ -1,70 +1,76 @@
-// Custom scripts
 #include "parser.hpp"
+#include <cstring>
+#include <cstdlib>
+#include <string>
 
-// Gobals
-#define DEBUG true
-
-// Helper
-float get_key(const char* message, const char* key) {
-    char* found = std::strstr((char*)message, key);
-    if (found) {
-        return std::strtof(found + std::strlen(key), nullptr);
-    }
-    return 0.0f;
+// ==============================
+// HELPERS
+// ==============================
+static float get_key(const char* message, const char* key)
+{
+    const char* found = std::strstr(message, key);
+    if (!found) return 0.0f;
+    return std::strtof(found + std::strlen(key), nullptr);
 }
 
-// Main methods
+static void get_array(const char* message,
+                      const char* key,
+                      float* array,
+                      int size)
+{
+    const char* found = std::strstr(message, key);
+    if (!found) {
+        for (int i = 0; i < size; i++)
+            array[i] = 0.0f;
+        return;
+    }
+
+    const char* ptr = found + std::strlen(key);
+
+    for (int i = 0; i < size; i++) {
+        array[i] = std::strtof(ptr, const_cast<char**>(&ptr));
+    }
+}
+
+// ==============================
+// PARSE SERVER MESSAGE
+// ==============================
 MessageServer parse_message_from_server(const char* message)
 {
-    // DEBUG
-    // if (DEBUG) { std::cout << "\nMessage to parse: " << message << std::endl; }
+    MessageServer msg{};
 
-    // Initialize message struct
-    MessageServer message_parsed;
+    msg.angle    = get_key(message, "(angle ");
+    msg.trackPos = get_key(message, "(trackPos ");
 
-    message_parsed.angle    = get_key(message, "(angle ");
-    message_parsed.trackPos = get_key(message, "(trackPos ");
+    msg.speedX = get_key(message, "(speedX ");
+    msg.speedY = get_key(message, "(speedY ");
+    msg.speedZ = get_key(message, "(speedZ ");
 
-    message_parsed.speedX   = get_key(message, "(speedX ");
-    message_parsed.speedY   = get_key(message, "(speedY ");
-    message_parsed.speedZ   = get_key(message, "(speedZ ");
+    msg.distRaced   = get_key(message, "(distRaced ");
+    msg.lastLapTime = get_key(message, "(lastLapTime ");
 
-    message_parsed.distRaced = get_key(message, "(distRaced ");
-    message_parsed.lastLapTime = get_key(message, "(lastLapTime ");
+    get_array(message, "(track ", msg.track.data(), 19);
     
-    // DEBUG
-    if (DEBUG)
-    {
-        std::cout << "Message Parsed:"
-                << "\n  Angle:" << message_parsed.angle
-                << "\n  Track Pos:" << message_parsed.trackPos
-                << "\n  Speed X:" << message_parsed.speedX
-                << "\n  Speed Y:" << message_parsed.speedY
-                << "\n  Speed Z:" << message_parsed.speedZ
-                << "\n  Dist Raced:" << message_parsed.distRaced
-                << "\n  Last Lap Time:" << message_parsed.lastLapTime
-                << std::endl;
-    }
+    // NOVO: Parse damage
+    msg.damage = get_key(message, "(damage ");
 
-    return message_parsed;
+    return msg;
 }
 
-std::string parse_message_from_client(MessageClient control_message)
+// ==============================
+// PARSE CLIENT MESSAGE
+// ==============================
+std::string parse_message_from_client(MessageClient control)
 {
-    // Message to send
-    std::string message = "";
-    
-    message += "(accel "  + std::to_string(control_message.accel)  + ")";
-    message += "(brake "  + std::to_string(control_message.brake)  + ")";
-    message += "(clutch " + std::to_string(control_message.clutch) + ")";
-    message += "(gear "   + std::to_string(control_message.gear)   + ")";
-    message += "(steer "  + std::to_string(control_message.steer)  + ")";
-    message += "(focus "  + std::to_string(control_message.focus)  + ")";
-    message += "(meta "   + std::to_string(control_message.meta)   + ")";
-    message += "\0";
+    std::string msg;
 
-    // DEBUG
-    if (DEBUG) { std::cout << "Message Control:\n" << message << std::endl; }
+    msg += "(accel "  + std::to_string(control.accel)  + ")";
+    msg += "(brake "  + std::to_string(control.brake)  + ")";
+    msg += "(clutch " + std::to_string(control.clutch) + ")";
+    msg += "(gear "   + std::to_string(control.gear)   + ")";
+    msg += "(steer "  + std::to_string(control.steer)  + ")";
+    msg += "(focus "  + std::to_string(control.focus)  + ")";
+    msg += "(meta "   + std::to_string(control.meta)   + ")";
 
-    return message;
+    return msg;
 }

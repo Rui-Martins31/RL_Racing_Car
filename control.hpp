@@ -1,75 +1,32 @@
 #ifndef CONTROL_HPP
 #define CONTROL_HPP
 
-#include <iostream>
+#include <vector>
 #include <cmath>
-#include <fstream>
-#include <sstream>
-#include <map>
 #include <algorithm>
-#include <bits/stdc++.h>
+
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include "utils/parser.hpp"
-#include "utils/neural_network.hpp"
 
-// Auxiliary functions
-float velocity(float vel_x, float vel_y, float vel_z);
-int reward(bool out_of_bounds, float dist_raced, float last_lap_time);
-float remap(float value, float original_min, float original_max,
-                         float new_min, float new_max);
+/* ===== PPO API ===== */
 
-// Agent
-class Agent
-{
-public:
-    // Variables
-    NeuralNetwork nn;
-    int id;
-    float reward;
+void ppo_send_observation(const std::vector<float>& obs);
+std::vector<float> ppo_receive_action();
+void ppo_send_reward(float reward, bool done);
+void ppo_send_reset();
+void cleanup_ppo(); // ADICIONADO: função de limpeza
 
-    // Methods
-    Agent(int agent_num);
-    Agent(int agent_num, float agent_reward, const std::vector<Scalar>& weights);
-    ~Agent() {};
-};
+/* ===== CONTROL ===== */
 
+MessageClient step(int episode_cycles, const MessageServer& m);
 
-// Generation
-class Generation
-{
-private:
-    // Constants
-    const int AGENTS_NUM_TOTAL   = 50; // 50
-    const int AGENTS_NUM_SURVIVE = 25; // 25
+/* ===== UTILS ===== */
 
-    const float AGENT_PROB_NEW   = 0.25; // Probability of a new agent being born
-
-    const float MUTATION_PROB    = 0.3; // Probability of occuring a mutation
-    const float MUTATION_CHANGE  = 0.2;
-
-    // Variables
-    std::vector<Agent> arr_agents;
-    int generation_num_curr;
-    int agent_num_curr;
-    
-public:
-    // Constructor and Destructor
-    Generation();
-    ~Generation() {};
-
-    // Methods
-    bool load_last_complete_generation(const std::string& filepath);
-    MessageClient step(int episode_cycles, MessageServer message);
-    void update(float reward);
-    void populate();
-
-    // Getters and Setters
-    int get_current_generation_num() 
-        {return this->generation_num_curr;};
-    int get_current_agent_num()
-        {return this->agent_num_curr;};
-    std::vector<Scalar> get_weights_from_agent(int agent_num)
-        {return this->arr_agents[agent_num].nn.getWeights();};
-};
+float velocity(float vx, float vy, float vz);
+float remap(float v, float omin, float omax, float nmin, float nmax);
+int calculate_gear(float speed); // ADICIONADO: lógica de gear
 
 #endif

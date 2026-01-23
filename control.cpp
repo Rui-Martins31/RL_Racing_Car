@@ -1,383 +1,407 @@
-// Custom scripts
 #include "control.hpp"
+#include <cstring>
+#include <iostream>
+#include <sys/select.h>
 
-// Globals
-#define DEBUG false
-#define PATH_OUTPUT "output.csv"
-#define EPISODE_MAX 1000
-#define DISTANCE_MIN 300
+/* ================= PPO SOCKET ================= */
 
-#define MAX_SPEED 83.0
+static int ppo_sock = -1;
+static sockaddr_in ppo_addr{};
+static bool ppo_initialized = false;
 
-#define NN_TOPOLOGY {3, 3} // {3, 3, 3}
+/* ================= EPISODE STATE ================= */
 
+static float last_dist = 0.0f;
+static float last_damage = 0.0f;
+static int stagnation_steps = 0;
+static int low_speed_steps = 0;
+static int offtrack_steps = 0;
+static int global_episode_count = 0;  // NOVO: Contador global
 
-// Auxiliary Functions
-float velocity(float vel_x, float vel_y, float vel_z)
+/* ================= CONSTANTS ================= */
+
+#define PPO_IP "127.0.0.1"
+#define PPO_PORT 5555
+#define PPO_ACTION_TIMEOUT_MS 200
+
+#define MAX_SPEED 83.0f
+#define MAX_EPISODE_STEPS 2500
+#define STAGNATION_LIMIT 300
+#define LOW_SPEED_LIMIT 200
+#define WARMUP_STEPS 150
+#define MIN_SPEED_THRESHOLD 0.3f
+#define STAGNATION_THRESHOLD 0.01f
+
+// THRESHOLDS DE TERMINAÇÃO - Sistema de 3 níveis (INICIAL - PERMISSIVO)
+#define SOFT_OFFTRACK_THRESHOLD 1.0f   // Início da grama (warning)
+#define HARD_OFFTRACK_THRESHOLD 2.0f   // Muito fora (era 1.5, aumentado para treino inicial)
+#define OFFTRACK_TOLERANCE 100         // Steps permitidos fora (era 50, 2 segundos agora)
+#define DAMAGE_THRESHOLD 1000.0f       // Dano crítico (era 500, mais permissivo)
+#define DAMAGE_RATE_THRESHOLD 200.0f   // Dano por step (era 100, dobrado)
+
+/* ================= UTILS ================= */
+
+float velocity(float vx, float vy, float vz)
 {
-    return sqrt( pow(vel_x, 2) + pow(vel_y, 2) + pow(vel_z, 2) );
+    return std::sqrt(vx * vx + vy * vy + vz * vz);
 }
 
-float remap(float value, float original_min, float original_max,
-                         float new_min, float new_max)
+float remap(float v, float omin, float omax, float nmin, float nmax)
 {
-    return new_min + (value - original_min) * (new_max - new_min) / (original_max - original_min);
+    return nmin + (v - omin) * (nmax - nmin) / (omax - omin);
 }
 
-int reward(bool out_of_bounds, float dist_raced, float last_lap_time)
+/* ================= PPO ================= */
+
+static void init_ppo()
 {
-    /*
-    Rewards:
-        - Out of bounds: -10
-        - Complete lap: +10000
-        - Distance raced: +10 * distance
-        - Fastest lap: +5000
-    */
+    if (ppo_initialized) return;
 
-    // Reward
-    int reward_total = 0;
+    ppo_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    memset(&ppo_addr, 0, sizeof(ppo_addr));
 
-    if (out_of_bounds) reward_total += -10;
-    reward_total += 10 * dist_raced;
-    if (last_lap_time != 0.0) reward_total += 10000;
+    ppo_addr.sin_family = AF_INET;
+    ppo_addr.sin_port = htons(PPO_PORT);
+    inet_pton(AF_INET, PPO_IP, &ppo_addr.sin_addr);
 
-    return reward_total;
+    ppo_initialized = true;
+    std::cout << "[PPO] Initialized socket to " << PPO_IP << ":" << PPO_PORT << std::endl;
 }
 
-// Agent
-Agent::Agent(int agent_num)
-    : id(agent_num), reward(0.0f), nn(NN_TOPOLOGY, true)
+void ppo_send_observation(const std::vector<float>& obs)
 {
-}
-
-Agent::Agent(int agent_num, float agent_reward, const std::vector<Scalar>& weights)
-    : id(agent_num), reward(agent_reward), nn(NN_TOPOLOGY, false)
-{
-    this->nn.setWeights(weights);
-}
-
-
-// Generation
-Generation::Generation()
-{
-    // Pre-allocate
-    this->arr_agents.reserve(this->AGENTS_NUM_TOTAL);
-
-    // Load last generation
-    if (!load_last_complete_generation(PATH_OUTPUT)) {
-
-        // Start from scratch
-        for (size_t i = 0; i < this->AGENTS_NUM_TOTAL; i++) {
-            this->arr_agents.emplace_back(i);
-        }
-
-        this->generation_num_curr = 1;
-        this->agent_num_curr      = 0;
-    }
-    else {
-        // Add new agents
-        this->populate();
-
-        this->agent_num_curr = 0;
-    }
-}
-
-bool Generation::load_last_complete_generation(const std::string& filepath)
-{
-    // Open CSV file
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-
-    // Check if file is empty
-    file.seekg(0, std::ios::end);
-    if (file.tellg() == 0) {
-        file.close();
-        return false;
-    }
-    file.seekg(0, std::ios::beg);
-
-    // Parse all rows
-    struct ParsedAgent {
-        int generation;
-        float reward;
-        std::vector<Scalar> weights;
-    };
-    std::vector<ParsedAgent> all_agents;
-
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-
-        std::stringstream ss(line);
-        std::string token;
-        ParsedAgent agent;
-
-        // Parse generation number
-        if (!std::getline(ss, token, ',')) continue;
-        agent.generation = std::stoi(token);
-
-        // Parse reward
-        if (!std::getline(ss, token, ',')) continue;
-        agent.reward = std::stof(token);
-
-        // Parse weights
-        while (std::getline(ss, token, ',')) {
-            agent.weights.push_back(std::stof(token));
-        }
-
-        all_agents.push_back(agent);
-    }
-    file.close();
-
-    if (all_agents.empty()) {
-        return false;
-    }
-
-    // Group by generation number
-    std::map<int, std::vector<ParsedAgent>> generations;
-    for (const auto& agent : all_agents) {
-        generations[agent.generation].push_back(agent);
-    }
-
-    // Find complete generations and the last complete one
-    int last_complete_gen = -1;
-    std::vector<int> complete_gens;
-    for (const auto& pair : generations) {
-        if (static_cast<int>(pair.second.size()) == AGENTS_NUM_TOTAL) {
-            complete_gens.push_back(pair.first);
-            if (pair.first > last_complete_gen) {
-                last_complete_gen = pair.first;
-            }
-        }
-    }
-
-    // No complete generation found
-    if (last_complete_gen == -1) {
-        // Clear the file
-        std::ofstream clear_file(filepath, std::ios::trunc);
-        clear_file.close();
-        return false;
-    }
-
-    // Rewrite CSV keeping only complete generations
-    std::ofstream out_file(filepath, std::ios::trunc);
-    if (out_file.is_open()) {
-        for (const auto& agent : all_agents) {
-            // Check if this agent belongs to a complete generation
-            bool is_complete = std::find(complete_gens.begin(), complete_gens.end(), agent.generation) != complete_gens.end();
-            if (is_complete) {
-                out_file << agent.generation << "," << agent.reward;
-                for (const auto& w : agent.weights) {
-                    out_file << "," << w;
-                }
-                out_file << "\n";
-            }
-        }
-        out_file.close();
-    }
-
-    // Get agents from last complete generation and sort by reward (descending)
-    std::vector<ParsedAgent>& last_gen_agents = generations[last_complete_gen];
-    std::sort(last_gen_agents.begin(), last_gen_agents.end(),
-        [](const ParsedAgent& a, const ParsedAgent& b) {
-            return a.reward > b.reward;
-        });
-
-    // Keep top AGENTS_NUM_SURVIVE agents and add to arr_agents
-    this->arr_agents.clear();
-    int count = 0;
-    for (const auto& agent : last_gen_agents) {
-        if (count >= AGENTS_NUM_SURVIVE) break;
-        this->arr_agents.emplace_back(count, agent.reward, agent.weights);
-        count++;
-    }
-
-    // Set generation number
-    this->generation_num_curr = last_complete_gen + 1;
-
-    return true;
-}
-
-MessageClient Generation::step(int episode_cycles, MessageServer message)
-{
-    // Control struct
-    MessageClient control;
-
-    // Neural Network
-    NeuralNetwork& nn = this->arr_agents[this->agent_num_curr].nn;
-
-    // Inputs {vel, ang, pos}
-    RowVector inputs(3);
-    inputs[0] = velocity(message.speedX, message.speedY, message.speedZ) / MAX_SPEED;
-    inputs[1] = remap(message.angle, -3.1416, 3.1416, -1.0, 1.0);
-    inputs[2] = message.trackPos;//remap(message.trackPos, -1.0, 1.0, 0.0, 1.0);
-
-    // DEBUG
-    std::cout << "NN Input:\n" 
-              << "  Speed: "   << inputs[0]
-              << "  Angle: "   << inputs[1]
-              << "  Track Pos: "   << inputs[2]
-              << std::endl;
-
-    // Forward {accel, brake, steer}
-    RowVector outputs = nn.propagateForward(inputs, true);
-
-    // Output
-    control.accel = remap(outputs[0], -1.0, 1.0, 0.0, 1.0);
-    control.brake = remap(outputs[1], -1.0, 1.0, 0.0, 1.0);
-    control.steer = outputs[2];//remap(outputs[2], 0.0, 1.0, -1.0, 1.0);
+    init_ppo();
     
-    // DEBUG
-    std::cout << "NN Output:\n" 
-              << "  Accel: "   << outputs[0]
-              << "  Brake: "   << outputs[1]
-              << "  Sterr: "   << outputs[2]
-              << std::endl;
+    int flags = MSG_DONTWAIT;
+    ssize_t sent = sendto(ppo_sock, obs.data(), obs.size() * sizeof(float), flags,
+                          (sockaddr*)&ppo_addr, sizeof(ppo_addr));
     
-    // DO NOT CHANGE ----
-    control.clutch = 0.0;
-    control.focus  = 0.0;
-    control.gear   = 1;
-    
-    // Check if car is out of track
-    // or if it's the end of episode
-    bool out_of_bounds  = (message.trackPos < -1.0 || message.trackPos > 1.0);
-    bool end_of_episode = 
-        (episode_cycles % EPISODE_MAX == 0) &&
-        (message.distRaced / ((float)DISTANCE_MIN * episode_cycles / EPISODE_MAX) < 1.0);
-    bool end_of_lap     = (message.lastLapTime != 0.0);
-    if (out_of_bounds || end_of_episode || end_of_lap) {
-        control.meta = true;
-
-        // Store weights
-        int final_reward = reward(
-            out_of_bounds,
-            message.distRaced,
-            message.lastLapTime
-        );
-        this->arr_agents[this->agent_num_curr].nn.saveToCSV(
-            PATH_OUTPUT,
-            this->generation_num_curr,
-            final_reward
-        );
-
-        // Update
-        this->update((float)final_reward);
+    if (sent < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        static int error_count = 0;
+        if (++error_count % 100 == 0) {
+            std::cerr << "[PPO] Error sending observation (" << error_count << " times)" << std::endl;
+        }
     }
-    else control.meta = false;
-    // DO NOT CHANGE ----
-
-    // DEBUG 
-    // std::cout << "Episode cycles: " << episode_cycles << std::endl;
-
-    return control;
 }
 
-void Generation::update(float reward)
+std::vector<float> ppo_receive_action()
 {
-    // Update current agent
-    this->arr_agents[this->agent_num_curr].reward = reward;
+    static float last_valid_action[2] = {0.0f, 0.95f};
+    float buf[2] = {0.0f, 0.95f};
 
-    // Check end of gen
-    if (this->agent_num_curr == this->AGENTS_NUM_TOTAL - 1) {
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(ppo_sock, &fds);
+
+    timeval tv{0, PPO_ACTION_TIMEOUT_MS * 1000};
+    int r = select(ppo_sock + 1, &fds, nullptr, nullptr, &tv);
+
+    if (r > 0) {
+        ssize_t received = recvfrom(ppo_sock, buf, sizeof(buf), MSG_DONTWAIT, nullptr, nullptr);
+        if (received == sizeof(buf)) {
+            last_valid_action[0] = buf[0];
+            last_valid_action[1] = buf[1];
+            return {buf[0], buf[1]};
+        }
+    }
+
+    static int timeout_count = 0;
+    if (++timeout_count % 100 == 1) {
+        std::cout << "[PPO] Warning: Timeout receiving action (" << timeout_count << " times)" << std::endl;
+    }
+    
+    return {last_valid_action[0], last_valid_action[1]};
+}
+
+void ppo_send_reward(float reward, bool done)
+{
+    float msg[2] = {reward, done ? 1.0f : 0.0f};
+    sendto(ppo_sock, msg, sizeof(msg), 0,
+           (sockaddr*)&ppo_addr, sizeof(ppo_addr));
+}
+
+void ppo_send_reset()
+{
+    uint32_t magic = 0xDEADBEEF;
+    sendto(ppo_sock, &magic, sizeof(magic), 0,
+           (sockaddr*)&ppo_addr, sizeof(ppo_addr));
+    
+    std::cout << "[PPO] Reset signal sent" << std::endl;
+}
+
+/* ================= GEAR LOGIC ================= */
+
+int calculate_gear(float speed)
+{
+    if (speed < 3.0f) return 1;
+    if (speed < 20.0f) return 2;
+    if (speed < 35.0f) return 3;
+    if (speed < 50.0f) return 4;
+    if (speed < 65.0f) return 5;
+    return 6;
+}
+
+/* ================= MAIN STEP ================= */
+
+MessageClient step(int episode_cycles, const MessageServer& m)
+{
+    MessageClient c{};
+
+    float speed = velocity(m.speedX, m.speedY, m.speedZ);
+
+    // ============================================
+    // OBSERVATION VECTOR (25 dims agora!)
+    // ============================================
+    std::vector<float> obs;
+    
+    obs.push_back(std::clamp(m.trackPos, -1.0f, 1.0f));
+    obs.push_back(std::clamp(m.angle / 3.1416f, -1.0f, 1.0f));
+    obs.push_back(std::clamp(speed / MAX_SPEED, 0.0f, 1.0f));
+    
+    for (int i = 0; i < 19; i++) {
+        obs.push_back(std::clamp(m.track[i] / 200.0f, 0.0f, 1.0f));
+    }
+    
+    obs.push_back(std::clamp(m.speedX / MAX_SPEED, -1.0f, 1.0f));
+    obs.push_back(std::clamp(m.speedY / MAX_SPEED, -1.0f, 1.0f));
+    
+    // NOVO: Adicionar damage normalizado
+    obs.push_back(std::clamp(m.damage / 10000.0f, 0.0f, 1.0f));
+    
+    ppo_send_observation(obs);
+
+    auto act = ppo_receive_action();
+    float steer = std::clamp(act[0], -1.0f, 1.0f);
+    float throttle = std::clamp(act[1], 0.0f, 1.0f);
+    
+    // CURRICULUM LEARNING: Limitar velocidade nos primeiros episódios
+    float max_speed_limit = 83.0f;  // Velocidade máxima padrão
+    
+    if (global_episode_count < 50) {
+        max_speed_limit = 40.0f;  // Primeiros 50 episódios: aprende devagar
+    } else if (global_episode_count < 150) {
+        max_speed_limit = 60.0f;  // Episódios 50-150: velocidade média
+    }
+    // Depois de 150 episódios: sem limites!
+    
+    // Aplicar limitador
+    if (speed > max_speed_limit) {
+        throttle *= 0.5f;  // Reduzir throttle se muito rápido
+    }
+    
+    if (episode_cycles % 50 == 0) {
+        std::cout << "[OBS] trackPos=" << m.trackPos 
+                  << ", angle=" << m.angle 
+                  << ", speed=" << speed 
+                  << ", damage=" << m.damage
+                  << ", frontSensor=" << m.track[9] << std::endl;
+        std::cout << "[ACT] steer=" << steer 
+                  << ", throttle=" << throttle << std::endl;
+    }
+
+    c.steer = steer;
+    c.accel = throttle;
+    
+    // NOVO: Brake automático em situações perigosas
+    c.brake = 0.0f;
+    
+    // Se está muito rápido E com ângulo MAU E próximo da borda
+    bool dangerous_situation = (speed > 25.0f) && 
+                               (std::abs(m.angle) > 0.5f) && 
+                               (std::abs(m.trackPos) > 0.7f);
+    
+    // Ou se sensor frontal detecta parede muito próxima
+    bool wall_ahead = m.track[9] < 10.0f && speed > 15.0f;
+    
+    if (dangerous_situation || wall_ahead) {
+        c.brake = 0.5f;  // Travagem moderada
+        c.accel = 0.0f;  // Cortar aceleração
         
-        // DEBUG
-        std::cout << "Starting new Generation number " << this->generation_num_curr+1 << std::endl;
-        
-        this->populate();
-        this->generation_num_curr += 1;
-        this->agent_num_curr       = 0;
+        if (episode_cycles % 50 == 0) {
+            std::cout << "[SAFETY] Auto-brake! speed=" << speed 
+                      << ", angle=" << m.angle 
+                      << ", trackPos=" << m.trackPos 
+                      << ", frontSensor=" << m.track[9] << std::endl;
+        }
     }
-    else {
-        this->agent_num_curr += 1;
+    
+    c.gear = calculate_gear(speed);
+    
+    if (episode_cycles < 10 && speed < 2.0f) {
+        c.clutch = 0.5f;
+    } else {
+        c.clutch = 0.0f;
+    }
+    
+    c.focus = 0.0f;
+    c.meta = false;
+    
+    /* ============================================
+       TERMINATION LOGIC - SISTEMA HÍBRIDO
+       ============================================ */
+
+    float dist_delta = m.distRaced - last_dist;
+    float damage_delta = m.damage - last_damage;
+    
+    // NÍVEL 1: Soft off-track (warning via reward)
+    bool soft_offtrack = std::abs(m.trackPos) > SOFT_OFFTRACK_THRESHOLD;
+    
+    // NÍVEL 2: Hard off-track (tolera temporariamente)
+    bool hard_offtrack = std::abs(m.trackPos) > HARD_OFFTRACK_THRESHOLD;
+    
+    if (hard_offtrack)
+        offtrack_steps++;
+    else
+        offtrack_steps = 0;
+    
+    // NÍVEL 3: Dano crítico
+    bool critical_damage = m.damage > DAMAGE_THRESHOLD;
+    bool continuous_damage = damage_delta > DAMAGE_RATE_THRESHOLD;
+    
+    // Terminar se:
+    // - Muito fora da pista POR MUITO TEMPO (não um toque rápido)
+    // - Dano crítico acumulado (bateu forte)
+    // - Dano contínuo (a bater na parede)
+    bool off_track = (offtrack_steps > OFFTRACK_TOLERANCE) || 
+                     critical_damage || 
+                     continuous_damage;
+    
+    bool timeout = episode_cycles >= MAX_EPISODE_STEPS;
+
+    // Stagnation check
+    if (dist_delta < STAGNATION_THRESHOLD)
+        stagnation_steps++;
+    else
+        stagnation_steps = 0;
+
+    last_dist = m.distRaced;
+    last_damage = m.damage;
+    
+    if (episode_cycles % 100 == 0) {
+        std::cout << "[Step " << episode_cycles << "] "
+                  << "Speed=" << speed << " | "
+                  << "Gear=" << c.gear << " | "
+                  << "Throttle=" << throttle << " | "
+                  << "Dist=" << m.distRaced << "m (Δ=" << dist_delta << ") | "
+                  << "TrackPos=" << m.trackPos << " | "
+                  << "Damage=" << m.damage << " (Δ=" << damage_delta << ") | "
+                  << "OfftrackSteps=" << offtrack_steps << "/" << OFFTRACK_TOLERANCE << std::endl;
     }
 
-}
+    // Speed checks
+    if (speed < MIN_SPEED_THRESHOLD)
+        low_speed_steps++;
+    else
+        low_speed_steps = 0;
 
-void Generation::populate()
-{
-    // Pick the top agents
-    // In case there are more than the maximum
-    std::cout << "Picking top agents..." << std::endl;
-    if (this->arr_agents.size() > this->AGENTS_NUM_SURVIVE){
+    bool stuck = (stagnation_steps > STAGNATION_LIMIT) || 
+                 (low_speed_steps > LOW_SPEED_LIMIT);
 
-        // Sort agents by reward in descending order
-        std::cout << "Sort agents..." << std::endl;
-        std::sort(this->arr_agents.begin(), this->arr_agents.end(),
-            [](const Agent& a, const Agent& b) {
-                return a.reward > b.reward;
-            });
-
-        // Keep only the top agents
-        std::cout << "Erase low reward agents..." << std::endl;
-        this->arr_agents.erase(
-            this->arr_agents.begin() + this->AGENTS_NUM_SURVIVE, 
-            this->arr_agents.end()
-        );
+    bool done = off_track || timeout ||
+                (episode_cycles > WARMUP_STEPS && stuck);
+    
+    if (done) {
+        std::cout << "\n[TERMINATION] Episode " << episode_cycles << ":" << std::endl;
+        std::cout << "  - off_track: " << off_track << std::endl;
+        std::cout << "    · trackPos: " << m.trackPos << " (hard=" << hard_offtrack 
+                  << ", steps=" << offtrack_steps << "/" << OFFTRACK_TOLERANCE << ")" << std::endl;
+        std::cout << "    · damage: " << m.damage << " (critical=" << critical_damage 
+                  << ", delta=" << damage_delta << ")" << std::endl;
+        std::cout << "  - timeout: " << timeout << std::endl;
+        std::cout << "  - stuck: " << stuck << " (stag=" << stagnation_steps 
+                  << "/" << STAGNATION_LIMIT << ", low_spd=" << low_speed_steps 
+                  << "/" << LOW_SPEED_LIMIT << ")" << std::endl;
+        std::cout << "  - speed: " << speed << " m/s" << std::endl;
+        std::cout << std::endl;
     }
 
-    // Mutate and randomize new agents
-    std::cout << "Giving birth to new agents..." << std::endl;
-    for (size_t agent_idx = this->AGENTS_NUM_SURVIVE;
-         agent_idx < this->AGENTS_NUM_TOTAL;
-         agent_idx++)
+    /* ============================================
+       REWARD SHAPING - OTIMIZADO PARA APRENDIZADO
+       ============================================ */
+
+    float reward = 0.0f;
+    
+    // Rewards positivos (AUMENTADOS para encorajar progresso)
+    reward += dist_delta * 5.0f;           // Era 2.0 - PRIORIZAR progredir
+    reward += speed * 0.1f;                // Era 0.05 - Velocidade importa
+    
+    // Penalties graduais (REDUZIDAS no início)
+    reward -= std::abs(m.trackPos) * 0.1f; // Era 0.2 - Mais tolerante
+    reward -= std::abs(m.angle) * 0.1f;    // Era 0.05 - AUMENTADO - ângulo é crítico!
+    
+    // Bonus por estar centralizado E com ângulo correto
+    if (std::abs(m.trackPos) < 0.5f && std::abs(m.angle) < 0.3f) {
+        reward += 1.0f;  // NOVO: Bonus por controle
+    }
+    
+    // NOVO: Bonus por antecipar curvas (reduzir velocidade quando sensores detectam)
+    float front_sensor = m.track[9];  // Sensor central frontal
+    if (front_sensor < 30.0f && speed < 20.0f) {
+        reward += 0.5f;  // Boa decisão: desacelerar em curva
+    } else if (front_sensor < 20.0f && speed > 25.0f) {
+        reward -= 2.0f;  // Má decisão: muito rápido para a curva!
+    }
+    
+    // Penalty suave por estar na grama (soft off-track)
+    if (soft_offtrack && !hard_offtrack) {
+        reward -= 1.0f;  // Era 0.5 - Aumentado: EVITA a relva!
+    }
+    
+    // Penalty moderada por estar muito fora
+    if (hard_offtrack) {
+        reward -= 5.0f;  // Era 2.0 - Aumentado: PERIGO REAL!
+    }
+    
+    // Penalty por dano
+    reward -= damage_delta * 0.1f;  // Cada ponto de dano = -0.1 reward
+
+    // Penalties de terminação
+    if (off_track) {
+        if (critical_damage || continuous_damage) {
+            reward -= 100.0f;  // Era 50 - Crash é MUITO MAU
+            std::cout << "[TERM] CRASH! Damage=" << m.damage << std::endl;
+        } else {
+            reward -= 50.0f;  // Era 20 - Sair da pista é MAU
+            std::cout << "[TERM] Off track for too long!" << std::endl;
+        }
+    }
+    
+    if (stuck) {
+        reward -= 30.0f;  // Era 10 - Ficar parado é MAU
+        std::cout << "[TERM] Stuck! (Speed=" << speed << " m/s)" << std::endl;
+    }
+
+    ppo_send_reward(reward, done);
+
+    if (done)
     {
-        // Create a random device and seed the generator
-        std::random_device rd;
-        std::mt19937 gen(rd());
-
-        // Define distribution between 0.0 and NUM_SURVIVORS
-        std::uniform_int_distribution<int> distr_int(0, this->AGENTS_NUM_SURVIVE - 1);
-
-        std::uniform_real_distribution<float> distr_float(0.0, 1.0);
-
-        // New Agent
-        float prob_new_agent = distr_float(gen);
-        if (prob_new_agent <= this->AGENT_PROB_NEW) {
-            arr_agents.emplace_back(agent_idx);
-            continue;
-        }
-
-        // Child
-        std::vector<Scalar> weights_child;
-        int father_1_idx  = distr_int(gen);
-        int father_2_idx  = distr_int(gen);
-        std::vector<Scalar> weights_father_1 
-            = this->arr_agents[father_1_idx].nn.getWeights();
-        std::vector<Scalar> weights_father_2
-            = this->arr_agents[father_2_idx].nn.getWeights();
-
-        for (size_t weight_idx = 0;
-             weight_idx < this->arr_agents[agent_idx-1].nn.getWeightCount();
-             weight_idx++)
-        {
-            // Select weight from father
-            Scalar weight_temp;
-            if (weight_idx % 2 == 0)
-                weight_temp = weights_father_1[weight_idx];
-            else
-                weight_temp = weights_father_2[weight_idx];
-
-            // Mutation
-            float prob_mutation  = distr_float(gen);
-            if (prob_mutation <= this->MUTATION_PROB) {
-                // Add os subtracts to the weight
-                if (prob_mutation <= this->MUTATION_PROB / 2)
-                    weight_temp -= this->MUTATION_CHANGE;
-                else
-                    weight_temp += this->MUTATION_CHANGE;
-            }
-
-            weights_child.emplace_back(weight_temp);
-        }
-
-        // Add child agent
-        this->arr_agents.emplace_back(agent_idx, 0.0, weights_child);
+        float avg_speed = (episode_cycles > 0) ? m.distRaced / (episode_cycles * 0.02f) : 0.0f;
+        std::cout << "[EPISODE END] Steps: " << episode_cycles 
+                  << " | Distance: " << m.distRaced << "m"
+                  << " | Avg Speed: " << avg_speed << " m/s"
+                  << " | Total Damage: " << m.damage 
+                  << " | Global Episode: " << global_episode_count << std::endl;
         
+        stagnation_steps = 0;
+        low_speed_steps = 0;
+        offtrack_steps = 0;
+        last_dist = 0.0f;
+        last_damage = 0.0f;
+        global_episode_count++;  // NOVO: Incrementar contador
 
+        ppo_send_reset();
+        c.meta = true;
     }
-    
 
+    return c;
+}
+
+void cleanup_ppo()
+{
+    if (ppo_sock >= 0) {
+        close(ppo_sock);
+        ppo_sock = -1;
+        ppo_initialized = false;
+        std::cout << "[PPO] Socket closed" << std::endl;
+    }
 }

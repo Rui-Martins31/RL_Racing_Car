@@ -1,51 +1,49 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
-#include <iostream>
-#include <cstring>
-#include <cstdlib>
 #include <string>
+#include <array>
 
-// Structs
-
+// ==============================
+// TORCS → CLIENT MESSAGE
+// ==============================
 struct MessageServer
 {
-    // Relative to the center of the track
     float angle;
     float trackPos;
- 
-    //Speed
+
     float speedX;
     float speedY;
     float speedZ;
 
-    // Variables for reward computation
     float distRaced;
-    float curLapTime;
     float lastLapTime;
-}; // This vars are enough for now
 
-struct MessageClient
-{
-    // Vars to control
-    float accel;
-    float brake;
-    float steer;
-
-    // 
-    float clutch;
-    int gear;
-    float focus;
-    bool meta;
+    // Track range sensors (19 values)
+    std::array<float, 19> track;
+    
+    // NOVO: Dano do carro
+    float damage;
 };
 
+// ==============================
+// CLIENT → TORCS MESSAGE
+// ==============================
+struct MessageClient
+{
+    float accel;
+    float brake;
+    float clutch;
+    int   gear;
+    float steer;
+    float focus;
+    bool  meta;
+};
 
-// Methods
-
-// Parse a given message and returns an array with the data
+// ==============================
+// PARSER FUNCTIONS
+// ==============================
 MessageServer parse_message_from_server(const char* message);
-
-// Parse a MessageClient struct and returns a string
 std::string parse_message_from_client(MessageClient control_message);
 
-#endif
+#endif // PARSER_HPP
