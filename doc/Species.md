@@ -183,3 +183,46 @@ Reward:
 Notes:
     - First generation is based on the last generation of [Species 3](#species-3)
     - Log: output/output_11.csv
+
+### Species 5
+
+Generation:
+    - 50 agents
+    - 25 survivors
+    - 10% probability of a new agent being born
+    - 75% occuring a mutation
+    - 0.05 change in weights in case of mutation
+
+Neural Networks:
+    - Topology: 8 (input), 4 (output)
+    - All weights have values between [-1.0, 1.0].
+    - Activation Function: Modified ReLU - [-1.0, 1.0]
+    - Inputs:
+        - speed: [0.0, 1.0] (up to 84 km/h)
+        - angle: [-1.0, 1.0]
+        - trackPos: [-1.0, 1.0]
+        - rpm: [0.0, 1.0]
+        - gear: [-1.0, 1.0]
+        - sensor_left: [0.0, 1.0]
+        - sensor_middle: [0.0, 1.0]
+        - sensor_right: [0.0, 1.0]
+    - Outputs:
+        - accel: [-1.0, 1.0] -> remap [0.0, 1.0]
+        - brake: [-1.0, 1.0] -> remap [0.0, 1.0]
+        - steer: [-1.0, 1.0]
+        - gear_change: [-1.0, 1.0]
+
+Reward:
+    - Distance Raced: distRaced * 10
+    - Out of bounds: -10
+    - Fastest: distRaced/(predicted distRaced in that time) * 10
+    - Complete lap: 10000
+    - Improperly shifted gears: -10
+    - Properly shifted gears: 10
+    - Shifted gears at the start of race: -10
+    - Turbulent steering: -10
+
+Notes:
+    - First generation is based on the last generation of [Species 4](#species-4)
+    - This species was created to fine tune the previous one
+    - Log: output/output_12.csv
